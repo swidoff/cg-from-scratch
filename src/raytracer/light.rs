@@ -19,7 +19,7 @@ pub enum Reflection {
     Diffuse,
 
     // Specular: A shiny reflection. Surface is even so light is scattered in a single (or close to a single)
-    // direction, the vector R. The greater the shininess, the close the reflected vector is to R.
+    // direction, the vector R. The greater the shininess the lower the reflected light as you move away from R.
     Specular { shininess: f64 },
 }
 
