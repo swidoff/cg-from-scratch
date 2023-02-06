@@ -1,7 +1,6 @@
-use crate::raytracer::light::{Light, Reflection};
+use crate::raytracer::light::{Light, Scatter};
 use crate::raytracer::objects;
-use crate::raytracer::objects::Sphere;
-use crate::raytracer::ray::Ray;
+use crate::raytracer::objects::{Intersection, Sphere};
 use crate::raytracer::vec3::{Color, Point, Vec3};
 use crate::utils;
 use wasm_bindgen::prelude::*;
@@ -20,25 +19,29 @@ fn new_scene() -> Scene {
             Point::new(0.0, -1.0, 3.0),
             1.0,
             Color::new(255.0, 0.0, 0.0),
-            Reflection::Specular { shininess: 500. },
+            Scatter::Specular { shininess: 500. },
+            0.2,
         ),
         Sphere::new(
             Point::new(2.0, 0.0, 4.0),
             1.0,
             Color::new(0.0, 0.0, 255.0),
-            Reflection::Specular { shininess: 500. },
+            Scatter::Specular { shininess: 500. },
+            0.3,
         ),
         Sphere::new(
             Point::new(-2.0, 0.0, 4.0),
             1.0,
             Color::new(0.0, 255.0, 0.0),
-            Reflection::Specular { shininess: 10. },
+            Scatter::Specular { shininess: 10. },
+            0.4,
         ),
         Sphere::new(
             Point::new(0., -5001.0, 0.0),
             5000.,
             Color::new(255.0, 255.0, 0.0),
-            Reflection::Specular { shininess: 1000. },
+            Scatter::Specular { shininess: 1000. },
+            0.5,
         ),
     ];
 
@@ -77,7 +80,7 @@ pub fn render(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     } = new_scene();
 
     let camera = Vec3::new(0.0, 0.0, 0.0);
-    let background_color = Color::new(255., 255., 255.);
+    let background_color = Color::new(0., 0., 0.);
 
     let viewport_width_scale = viewport_width as f64 / canvas_width as f64;
     let viewport_height_scale = viewport_height as f64 / canvas_height as f64;
@@ -87,16 +90,7 @@ pub fn render(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
         for canvas_x in 0..canvas_width as usize {
             let viewport_x = (canvas_x as f64 - canvas_width as f64 / 2.0) * viewport_width_scale;
             let direction = Vec3::new(viewport_x, viewport_y, projection_pane_d);
-            let ray = Ray::new(camera.clone(), direction);
-
-            let color = objects::closest_intersection(&objects, &ray, 1.0, f64::INFINITY)
-                .map(|int| {
-                    int.color
-                        * int
-                            .reflection
-                            .intensity(&lights, &objects, &ray, &int.p, &int.normal)
-                })
-                .unwrap_or_else(|| background_color.clone());
+            let color = trace_ray(&camera, &direction, &lights, &objects, background_color, 3);
 
             res.push(color[0].clamp(0., 255.) as u8);
             res.push(color[1].clamp(0., 255.) as u8);
@@ -106,4 +100,41 @@ pub fn render(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     }
 
     res
+}
+
+fn trace_ray(
+    origin: &Point,
+    direction: &Vec3,
+    lights: &Vec<Light>,
+    objects: &Vec<Sphere>,
+    background_color: Vec3,
+    recursions_remaining: u8,
+) -> Color {
+    if let Some(Intersection {
+        p,
+        t: _t,
+        normal,
+        color,
+        scatter,
+        reflective,
+    }) = objects::closest_intersection(&objects, origin, direction, 1.0, f64::INFINITY)
+    {
+        let local_color = color * scatter.intensity(lights, objects, direction, &p, &normal);
+        if recursions_remaining == 0 || reflective == 0.0 {
+            local_color
+        } else {
+            let reflected_direction = (-direction).reflect(&normal);
+            let reflected_color = trace_ray(
+                &p,
+                &reflected_direction,
+                lights,
+                objects,
+                background_color,
+                recursions_remaining - 1,
+            );
+            local_color * (1.0 - reflective) + reflected_color * reflective
+        }
+    } else {
+        background_color
+    }
 }

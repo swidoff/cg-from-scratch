@@ -1,8 +1,6 @@
 use crate::raytracer::objects;
 use crate::raytracer::objects::Sphere;
-use crate::raytracer::ray::Ray;
 use crate::raytracer::vec3::{Point, Vec3};
-use web_sys::console::dir;
 
 pub enum Light {
     // Simulates the light being scattered by other objects without actually computing it.
@@ -17,7 +15,7 @@ pub enum Light {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Reflection {
+pub enum Scatter {
     // Diffuse: A matte reflection. Surface is irregular and so light is scattered equally in every direction.
     Diffuse,
 
@@ -26,7 +24,7 @@ pub enum Reflection {
     Specular { shininess: f64 },
 }
 
-impl Reflection {
+impl Scatter {
     /// Calculates the intensity of the light being reflected from an object that intersects with the ray emitting
     /// from the camera.
     ///
@@ -44,7 +42,7 @@ impl Reflection {
         &self,
         lights: &Vec<Light>,
         objects: &Vec<Sphere>,
-        ray: &Ray,
+        direction: &Vec3,
         point: &Point,
         normal: &Vec3,
     ) -> f64 {
@@ -65,10 +63,8 @@ impl Reflection {
                     _ => panic!("Can't happen"),
                 };
 
-                if objects::closest_intersection(objects, &Ray::new(*point, l), 0.001, t_max)
-                    .is_none()
-                {
-                    res += intensity * self.reflect(ray, &l, normal)
+                if objects::closest_intersection(objects, point, &l, 0.001, t_max).is_none() {
+                    res += intensity * self.reflect(direction, &l, normal)
                 }
             }
         }
@@ -78,7 +74,7 @@ impl Reflection {
     /// Returns the fraction of light that is reflected as a function of the angle between the surface normal and the
     /// direction of the light.
     ///
-    fn reflect(&self, ray: &Ray, l: &Vec3, normal: &Vec3) -> f64 {
+    fn reflect(&self, direction: &Vec3, l: &Vec3, normal: &Vec3) -> f64 {
         let n_dot_l = normal.dot(&l);
         let mut res = if n_dot_l > 0. {
             // We're computing intensity / area, which is the equivalent to the cosine of the angle between the light
@@ -88,12 +84,12 @@ impl Reflection {
             0.
         };
 
-        if let &Reflection::Specular { shininess } = self {
+        if let &Scatter::Specular { shininess } = self {
             // v is the vector from the object to the camera, so that's just -ray.direction;
-            let v = -ray.direction;
+            let v = -direction;
 
             // r is the light reflected from the surface normal.
-            let r = normal * normal.dot(l) * 2. - l;
+            let r = l.reflect(normal);
             let r_dot_v = r.dot(&v);
             if r_dot_v > 0. {
                 // The cosine of the angle between r and v, which is the fraction of light reflected back at v.

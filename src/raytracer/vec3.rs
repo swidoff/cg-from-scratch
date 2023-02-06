@@ -20,6 +20,10 @@ impl Vec3 {
     pub fn len(&self) -> f64 {
         self.dot(self).sqrt()
     }
+
+    pub fn reflect(&self, normal: &Vec3) -> Vec3 {
+        normal * normal.dot(self) * 2. - self
+    }
 }
 
 impl Neg for &Vec3 {
@@ -78,6 +82,14 @@ impl Add<Vec3> for &Vec3 {
 
     fn add(self, rhs: Vec3) -> Self::Output {
         self + &rhs
+    }
+}
+
+impl Add<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn add(self, rhs: Vec3) -> Self::Output {
+        &self + &rhs
     }
 }
 
