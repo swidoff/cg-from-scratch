@@ -1,5 +1,8 @@
+use crate::raytracer::objects;
+use crate::raytracer::objects::Sphere;
 use crate::raytracer::ray::Ray;
 use crate::raytracer::vec3::{Point, Vec3};
+use web_sys::console::dir;
 
 pub enum Light {
     // Simulates the light being scattered by other objects without actually computing it.
@@ -37,23 +40,37 @@ impl Reflection {
     /// returns: f64 the intensity of the reflection, which is determined by how the material scatters the light from
     /// the light sources and the angle at which the light hits the surface at the point the ray hits.
     ///
-    pub fn intensity(&self, lights: &Vec<Light>, ray: &Ray, point: &Point, normal: &Vec3) -> f64 {
+    pub fn intensity(
+        &self,
+        lights: &Vec<Light>,
+        objects: &Vec<Sphere>,
+        ray: &Ray,
+        point: &Point,
+        normal: &Vec3,
+    ) -> f64 {
         let mut res = 0.;
         for light in lights {
-            res += match light {
-                Light::Ambient { intensity } => *intensity,
-                Light::Point {
-                    intensity,
-                    position,
-                } => {
-                    let l = position - point;
-                    *intensity * self.reflect(ray, &l, normal)
+            if let &Light::Ambient { intensity } = light {
+                res += intensity
+            } else {
+                let (intensity, l, t_max) = match light {
+                    Light::Point {
+                        intensity,
+                        position,
+                    } => (*intensity, position - point, 1.0),
+                    Light::Directional {
+                        intensity,
+                        direction,
+                    } => (*intensity, *direction, f64::INFINITY),
+                    _ => panic!("Can't happen"),
+                };
+
+                if objects::closest_intersection(objects, &Ray::new(*point, l), 0.001, t_max)
+                    .is_none()
+                {
+                    res += intensity * self.reflect(ray, &l, normal)
                 }
-                Light::Directional {
-                    intensity,
-                    direction,
-                } => *intensity * self.reflect(ray, direction, normal),
-            };
+            }
         }
         res
     }

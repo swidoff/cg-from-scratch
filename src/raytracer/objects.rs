@@ -63,3 +63,15 @@ impl Sphere {
         }
     }
 }
+
+pub fn closest_intersection(
+    objects: &Vec<Sphere>,
+    ray: &Ray,
+    t_min: f64,
+    t_max: f64,
+) -> Option<Intersection> {
+    objects
+        .iter()
+        .filter_map(|obj| obj.intersect(&ray, t_min, t_max))
+        .min_by(|int1, int2| int1.t.partial_cmp(&int2.t).unwrap())
+}

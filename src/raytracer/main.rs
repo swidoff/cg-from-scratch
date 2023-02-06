@@ -1,4 +1,5 @@
 use crate::raytracer::light::{Light, Reflection};
+use crate::raytracer::objects;
 use crate::raytracer::objects::Sphere;
 use crate::raytracer::ray::Ray;
 use crate::raytracer::vec3::{Color, Point, Vec3};
@@ -88,16 +89,18 @@ pub fn render(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
             let direction = Vec3::new(viewport_x, viewport_y, projection_pane_d);
             let ray = Ray::new(camera.clone(), direction);
 
-            let color = objects
-                .iter()
-                .filter_map(|obj| obj.intersect(&ray, 1.0, f64::INFINITY))
-                .min_by(|int1, int2| int1.t.partial_cmp(&int2.t).unwrap())
-                .map(|int| int.color * int.reflection.intensity(&lights, &ray, &int.p, &int.normal))
+            let color = objects::closest_intersection(&objects, &ray, 1.0, f64::INFINITY)
+                .map(|int| {
+                    int.color
+                        * int
+                            .reflection
+                            .intensity(&lights, &objects, &ray, &int.p, &int.normal)
+                })
                 .unwrap_or_else(|| background_color.clone());
 
-            res.push(color[0] as u8);
-            res.push(color[1] as u8);
-            res.push(color[2] as u8);
+            res.push(color[0].clamp(0., 255.) as u8);
+            res.push(color[1].clamp(0., 255.) as u8);
+            res.push(color[2].clamp(0., 255.) as u8);
             res.push(255);
         }
     }
