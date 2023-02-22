@@ -134,3 +134,26 @@ impl Index<usize> for Vec3 {
         &self.e[index]
     }
 }
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct Mat3 {
+    e: [[f64; 3]; 3],
+}
+
+impl Mat3 {
+    pub fn new(e: [[f64; 3]; 3]) -> Mat3 {
+        Mat3 { e }
+    }
+}
+
+impl Mul<Vec3> for &Mat3 {
+    type Output = Vec3;
+
+    fn mul(self, v: Vec3) -> Self::Output {
+        Vec3::new(
+            self.e[0][0] * v[0] + self.e[0][1] * v[1] + self.e[0][2] * v[2],
+            self.e[1][0] * v[0] + self.e[1][1] * v[1] + self.e[1][2] * v[2],
+            self.e[2][0] * v[0] + self.e[2][1] * v[1] + self.e[2][2] * v[2],
+        )
+    }
+}

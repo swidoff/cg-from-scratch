@@ -1,11 +1,12 @@
 use crate::raytracer::light::{Light, Scatter};
 use crate::raytracer::objects;
 use crate::raytracer::objects::{Intersection, Sphere};
-use crate::raytracer::vec3::{Color, Point, Vec3};
+use crate::raytracer::vec3::{Color, Mat3, Point, Vec3};
 use crate::utils;
 use wasm_bindgen::prelude::*;
 
 struct Scene {
+    camera: Camera,
     lights: Vec<Light>,
     objects: Vec<Sphere>,
     viewport_width: f64,
@@ -14,6 +15,23 @@ struct Scene {
 }
 
 fn new_scene() -> Scene {
+    let camera = Camera::new(
+        Vec3::new(3., 0., 1.),
+        Mat3::new([
+            [
+                std::f64::consts::FRAC_1_SQRT_2,
+                0.,
+                -std::f64::consts::FRAC_1_SQRT_2,
+            ],
+            [0., 1., 0.],
+            [
+                std::f64::consts::FRAC_1_SQRT_2,
+                0.,
+                std::f64::consts::FRAC_1_SQRT_2,
+            ],
+        ]),
+    );
+
     let objects = vec![
         Sphere::new(
             Point::new(0.0, -1.0, 3.0),
@@ -58,11 +76,23 @@ fn new_scene() -> Scene {
     ];
 
     Scene {
+        camera,
         lights,
         objects,
         viewport_width: 1.0,
         viewport_height: 1.0,
         projection_pane_d: 1.0,
+    }
+}
+
+struct Camera {
+    position: Vec3,
+    rotation: Mat3,
+}
+
+impl Camera {
+    fn new(position: Vec3, rotation: Mat3) -> Camera {
+        Camera { position, rotation }
     }
 }
 
@@ -72,6 +102,7 @@ pub fn render(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
 
     let mut res = Vec::with_capacity(canvas_width * canvas_height * 4);
     let Scene {
+        camera,
         lights,
         objects,
         viewport_width,
@@ -79,7 +110,6 @@ pub fn render(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
         projection_pane_d,
     } = new_scene();
 
-    let camera = Vec3::new(0.0, 0.0, 0.0);
     let background_color = Color::new(0., 0., 0.);
 
     let viewport_width_scale = viewport_width as f64 / canvas_width as f64;
@@ -89,8 +119,15 @@ pub fn render(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
 
         for canvas_x in 0..canvas_width as usize {
             let viewport_x = (canvas_x as f64 - canvas_width as f64 / 2.0) * viewport_width_scale;
-            let direction = Vec3::new(viewport_x, viewport_y, projection_pane_d);
-            let color = trace_ray(&camera, &direction, &lights, &objects, background_color, 3);
+            let direction = &camera.rotation * Vec3::new(viewport_x, viewport_y, projection_pane_d);
+            let color = trace_ray(
+                &camera.position,
+                &direction,
+                &lights,
+                &objects,
+                background_color,
+                3,
+            );
 
             res.push(color[0].clamp(0., 255.) as u8);
             res.push(color[1].clamp(0., 255.) as u8);
