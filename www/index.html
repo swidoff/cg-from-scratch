@@ -1,12 +1,26 @@
 <!DOCTYPE html>
 <html>
-  <head>
+<head>
     <meta charset="utf-8">
     <title>Computer Graphics from Scratch</title>
-  </head>
-  <body>
-    <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
+</head>
+<body>
+<link rel="stylesheet" href="index.css">
+<script src="./bootstrap.js"></script>
+<noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
+
+<div class="tab">
+    <button id="raytracer-tab" class="tablinks" onclick="openTab('raytracer')">Raytracer</button>
+    <button id="rasterizer-tab" class="tablinks" onclick="openTab('rasterizer')">Rasterizer</button>
+</div>
+
+<div id="raytracer" class="tabcontent">
     <canvas id="raytracer-canvas" height="600" width="600"></canvas>
-    <script src="./bootstrap.js"></script>
-  </body>
+</div>
+
+<div id="rasterizer" class="tabcontent">
+    <canvas id="rasterizer-canvas" height="600" width="600"></canvas>
+</div>
+
+</body>
 </html>
