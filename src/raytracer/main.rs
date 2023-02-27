@@ -1,8 +1,8 @@
 use crate::raytracer::light::{Light, Scatter};
 use crate::raytracer::objects;
 use crate::raytracer::objects::{Intersection, Sphere};
-use crate::raytracer::vec3::{Color, Mat3, Point, Vec3};
 use crate::utils;
+use crate::vec3::{Color, Mat3, Point, Vec3};
 use wasm_bindgen::prelude::*;
 
 struct Scene {
@@ -97,7 +97,7 @@ impl Camera {
 }
 
 #[wasm_bindgen]
-pub fn render(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
+pub fn raytracer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     utils::set_panic_hook();
 
     let mut res = Vec::with_capacity(canvas_width * canvas_height * 4);

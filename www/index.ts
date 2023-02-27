@@ -17,19 +17,25 @@ export function openTab(tabName: "raytracer" | "rasterizer") {
             raytracer.style.display = "block";
             raytracer_tab.className = "tablinks active";
 
-            const canvas = document.getElementById("raytracer-canvas")  as HTMLCanvasElement
-            const ctx = canvas.getContext("2d");
-            const bytes = wasm.render(canvas.height, canvas.width);
-            const img_bytes = new Uint8ClampedArray(bytes);
-            const imageData = new ImageData(img_bytes, canvas.height, canvas.width)
-            ctx.putImageData(imageData, 0, 0)
+            render("raytracer-canvas", wasm.raytracer)
             break;
         case "rasterizer":
             raytracer.style.display = "none";
             raytracer_tab.className = "tablinks";
             rasterizer.style.display = "block";
             rasterizer_tab.className = "tablinks active";
+
+            render("rasterizer-canvas", wasm.rasterizer)
     }
 }
 
-openTab("raytracer")
+function render(canvas_id: string, func: (width: number, height: number) => Uint8Array) {
+    const canvas = document.getElementById(canvas_id)  as HTMLCanvasElement
+    const ctx = canvas.getContext("2d");
+    const bytes = func(canvas.height, canvas.width);
+    const img_bytes = new Uint8ClampedArray(bytes);
+    const imageData = new ImageData(img_bytes, canvas.height, canvas.width)
+    ctx.putImageData(imageData, 0, 0)
+}
+
+openTab("rasterizer")

@@ -1,5 +1,5 @@
 use crate::raytracer::light::Scatter;
-use crate::raytracer::vec3::{Color, Point, Vec3};
+use crate::vec3::{Color, Point, Vec3};
 
 pub struct Intersection {
     pub p: Point,

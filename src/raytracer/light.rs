@@ -1,6 +1,6 @@
 use crate::raytracer::objects;
 use crate::raytracer::objects::Sphere;
-use crate::raytracer::vec3::{Point, Vec3};
+use crate::vec3::{Point, Vec3};
 
 pub enum Light {
     // Simulates the light being scattered by other objects without actually computing it.

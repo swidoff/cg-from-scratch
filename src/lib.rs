@@ -1,7 +1,8 @@
 extern crate web_sys;
+pub mod rasterizer;
 pub mod raytracer;
-mod timer;
 mod utils;
+mod vec3;
 
 use wasm_bindgen::prelude::*;
 
