@@ -1,10 +1,11 @@
 use crate::log;
 use crate::vec3::{Color, Vec3};
 use itertools::Itertools;
+use std::ops::Add;
 use wasm_bindgen::prelude::*;
 
-const VIEWPORT_SIZE: f64 = 1.0;
-const PROJECTION_PLANE_Z: f64 = 1.0;
+const VIEWPORT_SIZE: f64 = 1.;
+const PROJECTION_PLANE_Z: f64 = 1.;
 
 #[wasm_bindgen]
 pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
@@ -13,48 +14,80 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     let red = Color::new(255., 0., 0.);
     let green = Color::new(0., 255., 0.);
     let blue = Color::new(0., 0., 255.);
+    let yellow = Color::new(255., 255., 0.);
+    let purple = Color::new(255., 0., 255.);
+    let cyan = Color::new(0., 255., 255.);
 
     // Chapter 6
     // canvas.draw_line(&Point::new(-200, -100), &Point::new(240, 120), &black);
     // canvas.draw_line(&Point::new(-50, -200), &Point::new(60, 240), &black);
 
     // Chapter 7
-    // let p0 = Point::new(-200, -250, 1.0);
-    // let p1 = Point::new(200, 50, 1.0);
-    // let p2 = Point::new(20, 250, 1.0);
+    // let p0 = Point::new(-200, -250, 1.);
+    // let p1 = Point::new(200, 50, 1.);
+    // let p2 = Point::new(20, 250, 1.);
     // canvas.draw_filled_triangle(&p0, &p1, &p2, &green);
     // canvas.draw_wire_frame_triangle(&p0, &p1, &p2, &black);
 
     // Chapter 8
     // let p0 = Point::new(-200, -250, 0.3);
     // let p1 = Point::new(200, 50, 0.1);
-    // let p2 = Point::new(20, 250, 1.0);
+    // let p2 = Point::new(20, 250, 1.);
     // canvas.draw_shaded_triangle(&p0, &p1, &p2, &green);
 
     // Chapter 9
-    let v_a = canvas.project(&Vertex::new(-2., -0.5, 5.));
-    let v_b = canvas.project(&Vertex::new(-2., 0.5, 5.));
-    let v_c = canvas.project(&Vertex::new(-1., 0.5, 5.));
-    let v_d = canvas.project(&Vertex::new(-1., -0.5, 5.));
-    let v_ab = canvas.project(&Vertex::new(-2., -0.5, 6.));
-    let v_bb = canvas.project(&Vertex::new(-2., 0.5, 6.));
-    let v_cb = canvas.project(&Vertex::new(-1., 0.5, 6.));
-    let v_db = canvas.project(&Vertex::new(-1., -0.5, 6.));
+    // let v_a = canvas.project(&Vertex::new(-2., -0.5, 5.));
+    // let v_b = canvas.project(&Vertex::new(-2., 0.5, 5.));
+    // let v_c = canvas.project(&Vertex::new(-1., 0.5, 5.));
+    // let v_d = canvas.project(&Vertex::new(-1., -0.5, 5.));
+    // let v_ab = canvas.project(&Vertex::new(-2., -0.5, 6.));
+    // let v_bb = canvas.project(&Vertex::new(-2., 0.5, 6.));
+    // let v_cb = canvas.project(&Vertex::new(-1., 0.5, 6.));
+    // let v_db = canvas.project(&Vertex::new(-1., -0.5, 6.));
+    //
+    // canvas.draw_line(&v_a, &v_b, &blue);
+    // canvas.draw_line(&v_b, &v_c, &blue);
+    // canvas.draw_line(&v_c, &v_d, &blue);
+    // canvas.draw_line(&v_a, &v_d, &blue);
+    //
+    // canvas.draw_line(&v_ab, &v_bb, &red);
+    // canvas.draw_line(&v_bb, &v_cb, &red);
+    // canvas.draw_line(&v_cb, &v_db, &red);
+    // canvas.draw_line(&v_ab, &v_db, &red);
+    //
+    // canvas.draw_line(&v_a, &v_ab, &green);
+    // canvas.draw_line(&v_b, &v_bb, &green);
+    // canvas.draw_line(&v_c, &v_cb, &green);
+    // canvas.draw_line(&v_d, &v_db, &green);
 
-    canvas.draw_line(&v_a, &v_b, &blue);
-    canvas.draw_line(&v_b, &v_c, &blue);
-    canvas.draw_line(&v_c, &v_d, &blue);
-    canvas.draw_line(&v_a, &v_d, &blue);
-
-    canvas.draw_line(&v_ab, &v_bb, &red);
-    canvas.draw_line(&v_bb, &v_cb, &red);
-    canvas.draw_line(&v_cb, &v_db, &red);
-    canvas.draw_line(&v_ab, &v_db, &red);
-
-    canvas.draw_line(&v_a, &v_ab, &green);
-    canvas.draw_line(&v_b, &v_bb, &green);
-    canvas.draw_line(&v_c, &v_cb, &green);
-    canvas.draw_line(&v_d, &v_db, &green);
+    // Chapter 10 -- part1
+    let cube = Model {
+        vertices: vec![
+            Vertex::new(1., 1., 1.),
+            Vertex::new(-1., 1., 1.),
+            Vertex::new(-1., -1., 1.),
+            Vertex::new(1., -1., 1.),
+            Vertex::new(1., 1., -1.),
+            Vertex::new(-1., 1., -1.),
+            Vertex::new(-1., -1., -1.),
+            Vertex::new(1., -1., -1.),
+        ],
+        triangles: vec![
+            Triangle::new(0, 1, 2, red),
+            Triangle::new(0, 2, 3, red),
+            Triangle::new(4, 0, 3, green),
+            Triangle::new(4, 3, 7, green),
+            Triangle::new(5, 4, 7, blue),
+            Triangle::new(5, 7, 6, blue),
+            Triangle::new(1, 5, 6, yellow),
+            Triangle::new(1, 6, 2, yellow),
+            Triangle::new(4, 5, 1, purple),
+            Triangle::new(4, 1, 0, purple),
+            Triangle::new(2, 6, 7, cyan),
+            Triangle::new(2, 7, 3, cyan),
+        ],
+    } + &Vec3::new(-1.5, 0., 7.);
+    canvas.render_object(&cube);
 
     canvas.pixels
 }
@@ -180,9 +213,21 @@ impl Canvas {
     }
 
     fn project(&self, v: &Vertex) -> Point {
-        let x = v.x * PROJECTION_PLANE_Z / v.z * self.width as f64 / VIEWPORT_SIZE;
-        let y = v.y * PROJECTION_PLANE_Z / v.z * self.height as f64 / VIEWPORT_SIZE;
-        Point::new(x as i64, y as i64, 1.0)
+        let x = v[0] * PROJECTION_PLANE_Z / v[2] * self.width as f64 / VIEWPORT_SIZE;
+        let y = v[1] * PROJECTION_PLANE_Z / v[2] * self.height as f64 / VIEWPORT_SIZE;
+        Point::new(x as i64, y as i64, 1.)
+    }
+
+    fn render_object(&mut self, object: &Model) {
+        let projected = object
+            .vertices
+            .iter()
+            .map(|v| self.project(v))
+            .collect_vec();
+
+        for Triangle { v1, v2, v3, color } in object.triangles.iter() {
+            self.draw_wire_frame_triangle(&projected[*v1], &projected[*v2], &projected[*v3], color)
+        }
     }
 }
 
@@ -198,15 +243,35 @@ impl Point {
     }
 }
 
-struct Vertex {
-    x: f64,
-    y: f64,
-    z: f64,
+type Vertex = Vec3;
+
+struct Triangle {
+    v1: usize,
+    v2: usize,
+    v3: usize,
+    color: Color,
 }
 
-impl Vertex {
-    fn new(x: f64, y: f64, z: f64) -> Vertex {
-        Vertex { x, y, z }
+impl Triangle {
+    fn new(v1: usize, v2: usize, v3: usize, color: Color) -> Triangle {
+        Triangle { v1, v2, v3, color }
+    }
+}
+
+struct Model {
+    vertices: Vec<Vertex>,
+    triangles: Vec<Triangle>,
+}
+
+impl Add<&Vec3> for Model {
+    type Output = Model;
+
+    fn add(self, rhs: &Vec3) -> Self::Output {
+        let vertices = self.vertices.iter().map(|v| v + rhs).collect_vec();
+        Model {
+            vertices,
+            triangles: self.triangles,
+        }
     }
 }
 
