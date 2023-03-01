@@ -36,14 +36,14 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     // canvas.draw_shaded_triangle(&p0, &p1, &p2, &green);
 
     // Chapter 9
-    // let v_a = canvas.project(&Vertex::new(-2., -0.5, 5.));
-    // let v_b = canvas.project(&Vertex::new(-2., 0.5, 5.));
-    // let v_c = canvas.project(&Vertex::new(-1., 0.5, 5.));
-    // let v_d = canvas.project(&Vertex::new(-1., -0.5, 5.));
-    // let v_ab = canvas.project(&Vertex::new(-2., -0.5, 6.));
-    // let v_bb = canvas.project(&Vertex::new(-2., 0.5, 6.));
-    // let v_cb = canvas.project(&Vertex::new(-1., 0.5, 6.));
-    // let v_db = canvas.project(&Vertex::new(-1., -0.5, 6.));
+    // let v_a = canvas.project(&Vec3::new(-2., -0.5, 5.));
+    // let v_b = canvas.project(&Vec3::new(-2., 0.5, 5.));
+    // let v_c = canvas.project(&Vec3::new(-1., 0.5, 5.));
+    // let v_d = canvas.project(&Vec3::new(-1., -0.5, 5.));
+    // let v_ab = canvas.project(&Vec3::new(-2., -0.5, 6.));
+    // let v_bb = canvas.project(&Vec3::new(-2., 0.5, 6.));
+    // let v_cb = canvas.project(&Vec3::new(-1., 0.5, 6.));
+    // let v_db = canvas.project(&Vec3::new(-1., -0.5, 6.));
     //
     // canvas.draw_line(&v_a, &v_b, &blue);
     // canvas.draw_line(&v_b, &v_c, &blue);
@@ -60,17 +60,17 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     // canvas.draw_line(&v_c, &v_cb, &green);
     // canvas.draw_line(&v_d, &v_db, &green);
 
-    // Chapter 10 -- part1
-    let cube = Model {
+    // Chapter 10
+    let cube_model = Model {
         vertices: vec![
-            Vertex::new(1., 1., 1.),
-            Vertex::new(-1., 1., 1.),
-            Vertex::new(-1., -1., 1.),
-            Vertex::new(1., -1., 1.),
-            Vertex::new(1., 1., -1.),
-            Vertex::new(-1., 1., -1.),
-            Vertex::new(-1., -1., -1.),
-            Vertex::new(1., -1., -1.),
+            Vec3::new(1., 1., 1.),
+            Vec3::new(-1., 1., 1.),
+            Vec3::new(-1., -1., 1.),
+            Vec3::new(1., -1., 1.),
+            Vec3::new(1., 1., -1.),
+            Vec3::new(-1., 1., -1.),
+            Vec3::new(-1., -1., -1.),
+            Vec3::new(1., -1., -1.),
         ],
         triangles: vec![
             Triangle::new(0, 1, 2, red),
@@ -86,8 +86,18 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
             Triangle::new(2, 6, 7, cyan),
             Triangle::new(2, 7, 3, cyan),
         ],
-    } + &Vec3::new(-1.5, 0., 7.);
-    canvas.render_object(&cube);
+    };
+    let cube1 = Instance {
+        model: &cube_model,
+        position: Vec3::new(-1.5, 0., 7.),
+    };
+    let cube2 = Instance {
+        model: &cube_model,
+        position: Vec3::new(1.25, 2., 7.5),
+    };
+    let scene = vec![cube1, cube2];
+
+    canvas.render_scene(&scene);
 
     canvas.pixels
 }
@@ -212,21 +222,29 @@ impl Canvas {
         }
     }
 
-    fn project(&self, v: &Vertex) -> Point {
+    fn project(&self, v: &Vec3) -> Point {
         let x = v[0] * PROJECTION_PLANE_Z / v[2] * self.width as f64 / VIEWPORT_SIZE;
         let y = v[1] * PROJECTION_PLANE_Z / v[2] * self.height as f64 / VIEWPORT_SIZE;
         Point::new(x as i64, y as i64, 1.)
     }
 
-    fn render_object(&mut self, object: &Model) {
-        let projected = object
-            .vertices
-            .iter()
-            .map(|v| self.project(v))
-            .collect_vec();
+    fn render_scene(&mut self, instances: &Vec<Instance>) {
+        for instance in instances.iter() {
+            let projected = instance
+                .model
+                .vertices
+                .iter()
+                .map(|v| self.project(&(v + instance.position)))
+                .collect_vec();
 
-        for Triangle { v1, v2, v3, color } in object.triangles.iter() {
-            self.draw_wire_frame_triangle(&projected[*v1], &projected[*v2], &projected[*v3], color)
+            for Triangle { v1, v2, v3, color } in instance.model.triangles.iter() {
+                self.draw_wire_frame_triangle(
+                    &projected[*v1],
+                    &projected[*v2],
+                    &projected[*v3],
+                    color,
+                )
+            }
         }
     }
 }
@@ -243,8 +261,6 @@ impl Point {
     }
 }
 
-type Vertex = Vec3;
-
 struct Triangle {
     v1: usize,
     v2: usize,
@@ -259,20 +275,13 @@ impl Triangle {
 }
 
 struct Model {
-    vertices: Vec<Vertex>,
+    vertices: Vec<Vec3>,
     triangles: Vec<Triangle>,
 }
 
-impl Add<&Vec3> for Model {
-    type Output = Model;
-
-    fn add(self, rhs: &Vec3) -> Self::Output {
-        let vertices = self.vertices.iter().map(|v| v + rhs).collect_vec();
-        Model {
-            vertices,
-            triangles: self.triangles,
-        }
-    }
+struct Instance<'a> {
+    model: &'a Model,
+    position: Vec3,
 }
 
 fn interpolate(i0: i64, d0: f64, i1: i64, d1: f64) -> impl Iterator<Item = (i64, f64)> {
