@@ -1,13 +1,18 @@
 use crate::log;
-use crate::vec3::Color;
+use crate::vec3::{Color, Vec3};
 use itertools::Itertools;
 use wasm_bindgen::prelude::*;
+
+const VIEWPORT_SIZE: f64 = 1.0;
+const PROJECTION_PLANE_Z: f64 = 1.0;
 
 #[wasm_bindgen]
 pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     let mut canvas = Canvas::new(canvas_height, canvas_width);
     let black = Color::new(0., 0., 0.);
+    let red = Color::new(255., 0., 0.);
     let green = Color::new(0., 255., 0.);
+    let blue = Color::new(0., 0., 255.);
 
     // Chapter 6
     // canvas.draw_line(&Point::new(-200, -100), &Point::new(240, 120), &black);
@@ -21,17 +26,42 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     // canvas.draw_wire_frame_triangle(&p0, &p1, &p2, &black);
 
     // Chapter 8
-    let p0 = Point::new(-200, -250, 0.3);
-    let p1 = Point::new(200, 50, 0.1);
-    let p2 = Point::new(20, 250, 1.0);
-    canvas.draw_shaded_triangle(&p0, &p1, &p2, &green);
+    // let p0 = Point::new(-200, -250, 0.3);
+    // let p1 = Point::new(200, 50, 0.1);
+    // let p2 = Point::new(20, 250, 1.0);
+    // canvas.draw_shaded_triangle(&p0, &p1, &p2, &green);
+
+    // Chapter 9
+    let v_a = canvas.project(&Vertex::new(-2., -0.5, 5.));
+    let v_b = canvas.project(&Vertex::new(-2., 0.5, 5.));
+    let v_c = canvas.project(&Vertex::new(-1., 0.5, 5.));
+    let v_d = canvas.project(&Vertex::new(-1., -0.5, 5.));
+    let v_ab = canvas.project(&Vertex::new(-2., -0.5, 6.));
+    let v_bb = canvas.project(&Vertex::new(-2., 0.5, 6.));
+    let v_cb = canvas.project(&Vertex::new(-1., 0.5, 6.));
+    let v_db = canvas.project(&Vertex::new(-1., -0.5, 6.));
+
+    canvas.draw_line(&v_a, &v_b, &blue);
+    canvas.draw_line(&v_b, &v_c, &blue);
+    canvas.draw_line(&v_c, &v_d, &blue);
+    canvas.draw_line(&v_a, &v_d, &blue);
+
+    canvas.draw_line(&v_ab, &v_bb, &red);
+    canvas.draw_line(&v_bb, &v_cb, &red);
+    canvas.draw_line(&v_cb, &v_db, &red);
+    canvas.draw_line(&v_ab, &v_db, &red);
+
+    canvas.draw_line(&v_a, &v_ab, &green);
+    canvas.draw_line(&v_b, &v_bb, &green);
+    canvas.draw_line(&v_c, &v_cb, &green);
+    canvas.draw_line(&v_d, &v_db, &green);
 
     canvas.pixels
 }
 
 struct Canvas {
-    height: i32,
-    width: i32,
+    height: i64,
+    width: i64,
     pixels: Vec<u8>,
 }
 
@@ -43,13 +73,13 @@ impl Canvas {
             pixels.push(0);
         }
         Canvas {
-            height: height as i32,
-            width: width as i32,
+            height: height as i64,
+            width: width as i64,
             pixels,
         }
     }
 
-    fn put_pixel(&mut self, x: i32, y: i32, color: &Color) {
+    fn put_pixel(&mut self, x: i64, y: i64, color: &Color) {
         let x = self.width / 2 + x;
         let y = self.height / 2 - y - 1;
         // log!("x: {}, y: {}", x, y);
@@ -68,13 +98,13 @@ impl Canvas {
             // line is horizontal-ish
             let (p0, p1) = if p0.x > p1.x { (p1, p0) } else { (p0, p1) };
             for (x, y) in interpolate(p0.x, p0.y as f64, p1.x, p1.y as f64) {
-                self.put_pixel(x, y as i32, color);
+                self.put_pixel(x, y as i64, color);
             }
         } else {
             // line is vertical-ish
             let (p0, p1) = if p0.y > p1.y { (p1, p0) } else { (p0, p1) };
             for (y, x) in interpolate(p0.y, p0.x as f64, p1.y, p1.x as f64) {
-                self.put_pixel(x as i32, y, color);
+                self.put_pixel(x as i64, y, color);
             }
         }
     }
@@ -106,8 +136,8 @@ impl Canvas {
 
         // Draw the horizontal line segments.
         for (i, &(y, x_left)) in left_side.iter().enumerate() {
-            for x in (x_left as i32)..(right_side[i].1 as i32 + 1) {
-                self.put_pixel(x as i32, y, color);
+            for x in (x_left as i64)..(right_side[i].1 as i64 + 1) {
+                self.put_pixel(x as i64, y, color);
             }
         }
     }
@@ -137,32 +167,50 @@ impl Canvas {
 
         // Draw the horizontal line segments.
         for (i, &(y, x_left)) in left_side.iter().enumerate() {
-            let x_left = x_left as i32;
-            let x_right = right_side[i].1 as i32;
+            let x_left = x_left as i64;
+            let x_right = right_side[i].1 as i64;
             let h_left = h_left[i].1;
             let h_right = h_right[i].1;
             let h_segment = interpolate(x_left, h_left, x_right, h_right);
 
             for (x, h) in h_segment {
-                self.put_pixel(x as i32, y, &(color * h));
+                self.put_pixel(x as i64, y, &(color * h));
             }
         }
+    }
+
+    fn project(&self, v: &Vertex) -> Point {
+        let x = v.x * PROJECTION_PLANE_Z / v.z * self.width as f64 / VIEWPORT_SIZE;
+        let y = v.y * PROJECTION_PLANE_Z / v.z * self.height as f64 / VIEWPORT_SIZE;
+        Point::new(x as i64, y as i64, 1.0)
     }
 }
 
 struct Point {
-    x: i32,
-    y: i32,
+    x: i64,
+    y: i64,
     h: f64,
 }
 
 impl Point {
-    fn new(x: i32, y: i32, h: f64) -> Point {
+    fn new(x: i64, y: i64, h: f64) -> Point {
         Point { x, y, h }
     }
 }
 
-fn interpolate(i0: i32, d0: f64, i1: i32, d1: f64) -> impl Iterator<Item = (i32, f64)> {
+struct Vertex {
+    x: f64,
+    y: f64,
+    z: f64,
+}
+
+impl Vertex {
+    fn new(x: f64, y: f64, z: f64) -> Vertex {
+        Vertex { x, y, z }
+    }
+}
+
+fn interpolate(i0: i64, d0: f64, i1: i64, d1: f64) -> impl Iterator<Item = (i64, f64)> {
     let a = if i0 == i1 {
         0.
     } else {
