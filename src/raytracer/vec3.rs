@@ -144,6 +144,8 @@ impl Mat3 {
     pub fn new(e: [[f64; 3]; 3]) -> Mat3 {
         Mat3 { e }
     }
+
+    fn inverse()
 }
 
 impl Mul<Vec3> for &Mat3 {

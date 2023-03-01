@@ -1,5 +1,5 @@
 use crate::log;
-use crate::vec3::{Color, Vec3};
+use crate::vec3::{Color, Mat3, Vec3};
 use itertools::Itertools;
 use std::ops::Add;
 use wasm_bindgen::prelude::*;
@@ -89,11 +89,17 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     };
     let cube1 = Instance {
         model: &cube_model,
-        position: Vec3::new(-1.5, 0., 7.),
+        transformation: Transformation {
+            translation: Vec3::new(-1.5, 0., 7.),
+            ..Transformation::noop()
+        },
     };
     let cube2 = Instance {
         model: &cube_model,
-        position: Vec3::new(1.25, 2., 7.5),
+        transformation: Transformation {
+            translation: Vec3::new(1.25, 2., 7.5),
+            ..Transformation::noop()
+        },
     };
     let scene = vec![cube1, cube2];
 
@@ -234,7 +240,7 @@ impl Canvas {
                 .model
                 .vertices
                 .iter()
-                .map(|v| self.project(&(v + instance.position)))
+                .map(|v| self.project(&(instance.transformation.transform(v))))
                 .collect_vec();
 
             for Triangle { v1, v2, v3, color } in instance.model.triangles.iter() {
@@ -281,7 +287,29 @@ struct Model {
 
 struct Instance<'a> {
     model: &'a Model,
-    position: Vec3,
+    transformation: Transformation,
+}
+
+struct Transformation {
+    scale: f64,
+    rotation: Mat3,
+    translation: Vec3,
+}
+
+impl Transformation {
+    fn noop() -> Transformation {
+        Transformation {
+            scale: 1.0,
+            rotation: Mat3::new([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]),
+            translation: Vec3::new(0., 0., 0.),
+        }
+    }
+
+    fn transform(&self, v: &Vec3) -> Vec3 {
+        let scaled = v * self.scale;
+        let rotated = &self.rotation * scaled;
+        return rotated + self.translation;
+    }
 }
 
 fn interpolate(i0: i64, d0: f64, i1: i64, d1: f64) -> impl Iterator<Item = (i64, f64)> {
