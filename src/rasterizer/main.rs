@@ -1,5 +1,5 @@
 use crate::log;
-use crate::vec3::{Color, Mat3, Vec3};
+use crate::vec3::{Color, Mat3, Mat4, Vec3, Vec4};
 use itertools::Itertools;
 use std::ops::Add;
 use wasm_bindgen::prelude::*;
@@ -87,24 +87,20 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
             Triangle::new(2, 7, 3, cyan),
         ],
     };
-    let cube1 = Instance {
-        model: &cube_model,
-        transformation: Transformation {
-            translation: Vec3::new(-1.5, 0., 7.),
-            ..Transformation::noop()
-        },
+    let scene = Scene {
+        camera: Camera::new(Vec3::new(-3., 1.0, 2.0), Mat3::new_oy_rotation_matrix(-30.)),
+        instances: vec![
+            Instance::new(&cube_model, 0.75, Mat3::identity(), Vec3::new(-1.5, 0., 7.)),
+            Instance::new(
+                &cube_model,
+                1.0,
+                Mat3::new_oy_rotation_matrix(195.),
+                Vec3::new(1.25, 2.5, 7.5),
+            ),
+        ],
     };
-    let cube2 = Instance {
-        model: &cube_model,
-        transformation: Transformation {
-            translation: Vec3::new(1.25, 2., 7.5),
-            ..Transformation::noop()
-        },
-    };
-    let scene = vec![cube1, cube2];
 
     canvas.render_scene(&scene);
-
     canvas.pixels
 }
 
@@ -228,29 +224,28 @@ impl Canvas {
         }
     }
 
-    fn project(&self, v: &Vec3) -> Point {
+    fn project(&self, v: &Vec4) -> Point {
         let x = v[0] * PROJECTION_PLANE_Z / v[2] * self.width as f64 / VIEWPORT_SIZE;
         let y = v[1] * PROJECTION_PLANE_Z / v[2] * self.height as f64 / VIEWPORT_SIZE;
         Point::new(x as i64, y as i64, 1.)
     }
 
-    fn render_scene(&mut self, instances: &Vec<Instance>) {
-        for instance in instances.iter() {
-            let projected = instance
-                .model
-                .vertices
-                .iter()
-                .map(|v| self.project(&(instance.transformation.transform(v))))
-                .collect_vec();
+    fn render_scene(&mut self, scene: &Scene) {
+        for instance in scene.instances.iter() {
+            let instance_transformation = &scene.camera.transformation * &instance.transformation;
+            self.render_model(instance.model, &instance_transformation)
+        }
+    }
 
-            for Triangle { v1, v2, v3, color } in instance.model.triangles.iter() {
-                self.draw_wire_frame_triangle(
-                    &projected[*v1],
-                    &projected[*v2],
-                    &projected[*v3],
-                    color,
-                )
-            }
+    fn render_model(&mut self, model: &Model, instance_transformation: &Mat4) {
+        let projected = model
+            .vertices
+            .iter()
+            .map(|v| self.project(&(instance_transformation * v.to_vec4(1.0))))
+            .collect_vec();
+
+        for Triangle { v1, v2, v3, color } in model.triangles.iter() {
+            self.draw_wire_frame_triangle(&projected[*v1], &projected[*v2], &projected[*v3], color)
         }
     }
 }
@@ -287,29 +282,38 @@ struct Model {
 
 struct Instance<'a> {
     model: &'a Model,
-    transformation: Transformation,
+    transformation: Mat4,
 }
 
-struct Transformation {
-    scale: f64,
-    rotation: Mat3,
-    translation: Vec3,
-}
+impl<'a> Instance<'a> {
+    fn new(model: &'a Model, scale: f64, rotation: Mat3, translation: Vec3) -> Instance<'a> {
+        let scaling_mat4 = Mat4::new_homogeneous_scaling_matrix(scale);
+        let rotation_mat4 = rotation.to_homogenous_rotation();
+        let translation_mat4 = translation.to_homogenous_translation();
+        let transformation = translation_mat4 * rotation_mat4 * scaling_mat4;
 
-impl Transformation {
-    fn noop() -> Transformation {
-        Transformation {
-            scale: 1.0,
-            rotation: Mat3::new([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]),
-            translation: Vec3::new(0., 0., 0.),
+        Instance {
+            model,
+            transformation,
         }
     }
+}
 
-    fn transform(&self, v: &Vec3) -> Vec3 {
-        let scaled = v * self.scale;
-        let rotated = &self.rotation * scaled;
-        return rotated + self.translation;
+struct Camera {
+    transformation: Mat4,
+}
+
+impl Camera {
+    fn new(position: Vec3, orientation: Mat3) -> Camera {
+        let transformation = orientation.transpose().to_homogenous_rotation()
+            * (position * -1.).to_homogenous_translation();
+        Camera { transformation }
     }
+}
+
+struct Scene<'a> {
+    camera: Camera,
+    instances: Vec<Instance<'a>>,
 }
 
 fn interpolate(i0: i64, d0: f64, i1: i64, d1: f64) -> impl Iterator<Item = (i64, f64)> {
