@@ -2,6 +2,7 @@ use crate::vec3::{Color, Mat3, Mat4, Vec3, Vec4};
 use crate::{log, utils};
 use itertools::Itertools;
 use wasm_bindgen::prelude::*;
+use web_sys::console::trace;
 
 const VIEWPORT_SIZE: f64 = 1.;
 const PROJECTION_PLANE_Z: f64 = 1.;
@@ -75,16 +76,16 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
         vec![
             Triangle::new(0, 1, 2, red),
             Triangle::new(0, 2, 3, red),
-            Triangle::new(4, 0, 3, green),
-            Triangle::new(4, 3, 7, green),
-            Triangle::new(5, 4, 7, blue),
-            Triangle::new(5, 7, 6, blue),
             Triangle::new(1, 5, 6, yellow),
             Triangle::new(1, 6, 2, yellow),
-            Triangle::new(4, 5, 1, purple),
-            Triangle::new(4, 1, 0, purple),
             Triangle::new(2, 6, 7, cyan),
             Triangle::new(2, 7, 3, cyan),
+            Triangle::new(4, 0, 3, green),
+            Triangle::new(4, 1, 0, purple),
+            Triangle::new(4, 3, 7, green),
+            Triangle::new(4, 5, 1, purple),
+            Triangle::new(5, 4, 7, blue),
+            Triangle::new(5, 7, 6, blue),
         ],
     );
     let sqrt_2 = 2.0_f64.sqrt();
@@ -127,33 +128,46 @@ struct Canvas {
     height: i64,
     width: i64,
     pixels: Vec<u8>,
+    depth_buffer: Vec<f64>,
 }
 
 impl Canvas {
     fn new(height: usize, width: usize) -> Canvas {
-        let capacity = width * height * 4;
-        let mut pixels = Vec::with_capacity(capacity);
-        for _i in 0..capacity {
+        let dim = width * height;
+        let pixel_bytes = dim * 4;
+        let mut pixels = Vec::with_capacity(pixel_bytes);
+        for _i in 0..pixel_bytes {
             pixels.push(0);
         }
+
+        let mut depth_buffer = Vec::with_capacity(dim);
+        for _i in 0..dim {
+            depth_buffer.push(f64::NEG_INFINITY);
+        }
+
         Canvas {
             height: height as i64,
             width: width as i64,
             pixels,
+            depth_buffer,
         }
     }
 
-    fn put_pixel(&mut self, x: i64, y: i64, color: &Color) {
+    fn put_pixel(&mut self, x: i64, y: i64, inv_z: f64, color: &Color) {
         let x = self.width / 2 + x;
         let y = self.height / 2 - y - 1;
-        // log!("x: {}, y: {}", x, y);
 
         if x >= 0 && x < self.width && y >= 0 && y < self.height {
-            let offset = (y * self.width * 4 + x * 4) as usize;
-            self.pixels[offset] = color[0].clamp(0., 255.) as u8;
-            self.pixels[offset + 1] = color[1].clamp(0., 255.) as u8;
-            self.pixels[offset + 2] = color[2].clamp(0., 255.) as u8;
-            self.pixels[offset + 3] = 255;
+            let depth_offset = (y * self.width + x) as usize;
+            if inv_z > self.depth_buffer[depth_offset] {
+                println!("{} {} {}", x, y, inv_z);
+                let pixel_offset = (y * self.width * 4 + x * 4) as usize;
+                self.pixels[pixel_offset] = color[0].clamp(0., 255.) as u8;
+                self.pixels[pixel_offset + 1] = color[1].clamp(0., 255.) as u8;
+                self.pixels[pixel_offset + 2] = color[2].clamp(0., 255.) as u8;
+                self.pixels[pixel_offset + 3] = 255;
+                self.depth_buffer[depth_offset] = inv_z;
+            }
         }
     }
 
@@ -162,13 +176,13 @@ impl Canvas {
             // line is horizontal-ish
             let (p0, p1) = if p0.x > p1.x { (p1, p0) } else { (p0, p1) };
             for (x, y) in interpolate(p0.x, p0.y as f64, p1.x, p1.y as f64) {
-                self.put_pixel(x, y as i64, color);
+                self.put_pixel(x, y as i64, 0., color);
             }
         } else {
             // line is vertical-ish
             let (p0, p1) = if p0.y > p1.y { (p1, p0) } else { (p0, p1) };
             for (y, x) in interpolate(p0.y, p0.x as f64, p1.y, p1.x as f64) {
-                self.put_pixel(x as i64, y, color);
+                self.put_pixel(x as i64, y, 0., color);
             }
         }
     }
@@ -179,51 +193,58 @@ impl Canvas {
         self.draw_line(p0, p2, color);
     }
 
-    fn draw_filled_triangle(&mut self, p0: &Point, p1: &Point, p2: &Point, color: &Color) {
-        let (p0, p1, p2) = sort_points_by_y(p0, p1, p2);
-
+    fn draw_filled_triangle(
+        &mut self,
+        triangle: &Triangle,
+        vertices: &Vec<Vec3>,
+        projected: &Vec<Point>,
+    ) {
         // Find the points along the sides of the triangle.
-        let x01 = interpolate(p0.y, p0.x as f64, p1.y, p1.x as f64);
-        let x02 = interpolate(p0.y, p0.x as f64, p2.y, p2.x as f64).collect_vec(); // Long size
-        let x12 = interpolate(p1.y, p1.x as f64, p2.y, p2.x as f64);
+        let [i0, i1, i2] = triangle.sorted_indexes_by_y(projected);
+        let p0 = &projected[i0];
+        let p1 = &projected[i1];
+        let p2 = &projected[i2];
+        let v0 = &vertices[i0];
+        let v1 = &vertices[i1];
+        let v2 = &vertices[i2];
 
-        // Concatenate the two short sides.
-        let x012 = x01.dropping(1).chain(x12).collect_vec();
+        let (x02, x012) = edge_interpolate(p0.y, p0.x as f64, p1.y, p1.x as f64, p2.y, p2.x as f64);
+        let (iz02, iz012) = edge_interpolate(p0.y, 1. / v0[2], p1.y, 1. / v1[2], p2.y, 1. / v2[2]);
 
         // Determine which side is the left and which is the right.
         let midpoint = x02.len() / 2;
-        let (left_side, right_side) = if x02[midpoint].0 < x012[midpoint].0 {
-            (x02, x012)
+        let (x_left, x_right, iz_left, iz_right) = if x02[midpoint].1 < x012[midpoint].1 {
+            (x02, x012, iz02, iz012)
         } else {
-            (x012, x02)
+            (x012, x02, iz012, iz02)
         };
 
         // Draw the horizontal line segments.
-        for (i, &(y, x_left)) in left_side.iter().enumerate() {
-            for x in (x_left as i64)..(right_side[i].1 as i64 + 1) {
-                self.put_pixel(x as i64, y, color);
+        for (i, &(y, x_left)) in x_left.iter().enumerate() {
+            let iz_segment = interpolate(
+                x_left as i64,
+                iz_left[i].1,
+                x_right[i].1 as i64,
+                iz_right[i].1,
+            );
+
+            for (x, inv_z) in iz_segment {
+                self.put_pixel(x as i64, y, inv_z, &triangle.color);
             }
         }
     }
 
-    fn draw_shaded_triangle(&mut self, p0: &Point, p1: &Point, p2: &Point, color: &Color) {
-        let (p0, p1, p2) = sort_points_by_y(p0, p1, p2);
-
-        // Find the points along the sides of the triangle.
-        let x01 = interpolate(p0.y, p0.x as f64, p1.y, p1.x as f64);
-        let h01 = interpolate(p0.y, p0.h as f64, p1.y, p1.h as f64);
-        let x02 = interpolate(p0.y, p0.x as f64, p2.y, p2.x as f64).collect_vec(); // Long size
-        let h02 = interpolate(p0.y, p0.h, p2.y, p2.h).collect_vec(); // Long size
-        let x12 = interpolate(p1.y, p1.x as f64, p2.y, p2.x as f64);
-        let h12 = interpolate(p1.y, p1.h, p2.y, p2.h);
-
-        // Concatenate the two short sides.
-        let x012 = x01.dropping(1).chain(x12).collect_vec();
-        let h012 = h01.dropping(1).chain(h12).collect_vec();
+    fn draw_shaded_triangle(&mut self, triangle: &Triangle, vertices: &Vec<Point>) {
+        let [i0, i1, i2] = triangle.sorted_indexes_by_y(vertices);
+        let p0 = &vertices[i0];
+        let p1 = &vertices[i1];
+        let p2 = &vertices[i2];
+        let (x02, x012) = edge_interpolate(p0.y, p0.x as f64, p1.y, p1.x as f64, p2.y, p2.x as f64);
+        let (h02, h012) = edge_interpolate(p0.y, p0.h, p1.y, p1.h, p2.y, p2.h);
 
         // Determine which side is the left and which is the right.
         let midpoint = x02.len() / 2;
-        let (left_side, right_side, h_left, h_right) = if x02[midpoint].0 < x012[midpoint].0 {
+        let (left_side, right_side, h_left, h_right) = if x02[midpoint].1 < x012[midpoint].1 {
             (x02, x012, h02, h012)
         } else {
             (x012, x02, h012, h02)
@@ -238,7 +259,7 @@ impl Canvas {
             let h_segment = interpolate(x_left, h_left, x_right, h_right);
 
             for (x, h) in h_segment {
-                self.put_pixel(x as i64, y, &(color * h));
+                self.put_pixel(x as i64, y, 0., &(triangle.color * h));
             }
         }
     }
@@ -266,8 +287,14 @@ impl Canvas {
             .map(|v| self.project(&v.to_vec4(1.0)))
             .collect_vec();
 
-        for Triangle { v1, v2, v3, color } in model.triangles.iter() {
-            self.draw_wire_frame_triangle(&projected[*v1], &projected[*v2], &projected[*v3], color)
+        for triangle in model.triangles.iter() {
+            // self.draw_wire_frame_triangle(
+            //     &projected[triangle.vertex_indices[0]],
+            //     &projected[triangle.vertex_indices[1]],
+            //     &projected[triangle.vertex_indices[2]],
+            //     &triangle.color,
+            // )
+            self.draw_filled_triangle(triangle, &model.vertices, &projected);
         }
     }
 }
@@ -286,15 +313,22 @@ impl Point {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 struct Triangle {
-    v1: usize,
-    v2: usize,
-    v3: usize,
+    vertex_indices: [usize; 3],
     color: Color,
 }
 
 impl Triangle {
     fn new(v1: usize, v2: usize, v3: usize, color: Color) -> Triangle {
-        Triangle { v1, v2, v3, color }
+        Triangle {
+            vertex_indices: [v1, v2, v3],
+            color,
+        }
+    }
+
+    fn sorted_indexes_by_y(&self, vertexes: &Vec<Point>) -> [usize; 3] {
+        let mut indexes = self.vertex_indices.clone();
+        indexes.sort_by_key(|&i| vertexes[i].y);
+        indexes
     }
 }
 
@@ -354,7 +388,6 @@ impl<'a> Instance<'a> {
     ) -> Option<Model> {
         let transformation = camera_transformation * &self.transformation;
         let (bounding_sphere_center, bounding_sphere_radius) = self.model.bounding_sphere();
-
         let bounding_sphere_center = &transformation * bounding_sphere_center.to_vec4(1.0);
         let bounding_sphere_radius = bounding_sphere_radius * self.scale;
 
@@ -391,7 +424,7 @@ impl<'a> Instance<'a> {
         vertices: &mut Vec<Vec3>,
         triangles: &mut Vec<Triangle>,
     ) {
-        let v = vec![triangle.v1, triangle.v2, triangle.v3];
+        let v = triangle.vertex_indices;
         let in_plane = v
             .iter()
             .map(|&v| (plane.normal.dot(&vertices[v]) + plane.distance))
@@ -511,15 +544,21 @@ fn interpolate(i0: i64, d0: f64, i1: i64, d1: f64) -> impl Iterator<Item = (i64,
     })
 }
 
-fn sort_points_by_y<'a>(
-    p0: &'a Point,
-    p1: &'a Point,
-    p2: &'a Point,
-) -> (&'a Point, &'a Point, &'a Point) {
-    let mut points = [p0, p1, p2];
-    points.sort_by_key(|&p| p.y);
-    let [p0, p1, p2] = points;
-    (p0, p1, p2)
+fn edge_interpolate(
+    y0: i64,
+    v0: f64,
+    y1: i64,
+    v1: f64,
+    y2: i64,
+    v2: f64,
+) -> (Vec<(i64, f64)>, Vec<(i64, f64)>) {
+    let v01 = interpolate(y0, v0, y1, v1);
+    let v02 = interpolate(y0, v0, y2, v2).collect_vec(); // Long size
+    let v12 = interpolate(y1, v1, y2, v2);
+
+    // Concatenate the two short sides.
+    let x012 = v01.dropping(1).chain(v12).collect_vec();
+    (v02, x012)
 }
 
 #[cfg(test)]
