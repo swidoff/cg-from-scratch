@@ -200,19 +200,8 @@ impl Canvas {
     ) {
         // Backface Culling
         let normal = triangle.normal(vertices);
-        let center = triangle.center(vertices);
-        let x1 = (-center).dot(&normal);
-        println!(
-            "v1={:?}, v2={:?}, v3={:?}, color={:?}, center={:?}, normal={:?}, dot={}",
-            vertices[triangle.vertex_indices[0]],
-            vertices[triangle.vertex_indices[1]],
-            vertices[triangle.vertex_indices[2]],
-            triangle.color,
-            center,
-            normal,
-            x1
-        );
-        if x1 <= 0. {
+        let center = -triangle.center(vertices);
+        if -center.dot(&normal) <= 0. {
             return;
         }
 
