@@ -1,7 +1,6 @@
-use crate::log;
 use crate::vec3::{Color, Mat3, Mat4, Vec3, Vec4};
+use crate::{log, utils};
 use itertools::Itertools;
-use std::ops::Add;
 use wasm_bindgen::prelude::*;
 
 const VIEWPORT_SIZE: f64 = 1.;
@@ -9,6 +8,7 @@ const PROJECTION_PLANE_Z: f64 = 1.;
 
 #[wasm_bindgen]
 pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
+    utils::set_panic_hook();
     let mut canvas = Canvas::new(canvas_height, canvas_width);
     let black = Color::new(0., 0., 0.);
     let red = Color::new(255., 0., 0.);
@@ -60,9 +60,9 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     // canvas.draw_line(&v_c, &v_cb, &green);
     // canvas.draw_line(&v_d, &v_db, &green);
 
-    // Chapter 10
-    let cube_model = Model {
-        vertices: vec![
+    // Chapter 10 + 11
+    let cube_model = Model::new(
+        vec![
             Vec3::new(1., 1., 1.),
             Vec3::new(-1., 1., 1.),
             Vec3::new(-1., -1., 1.),
@@ -72,7 +72,7 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
             Vec3::new(-1., -1., -1.),
             Vec3::new(1., -1., -1.),
         ],
-        triangles: vec![
+        vec![
             Triangle::new(0, 1, 2, red),
             Triangle::new(0, 2, 3, red),
             Triangle::new(4, 0, 3, green),
@@ -86,9 +86,21 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
             Triangle::new(2, 6, 7, cyan),
             Triangle::new(2, 7, 3, cyan),
         ],
-    };
+    );
+    let sqrt_2 = 2.0_f64.sqrt();
+    let camera = Camera::new(
+        Vec3::new(-3., 1.0, 2.0),
+        Mat3::new_oy_rotation_matrix(-30.),
+        vec![
+            Plane::new(Vec3::new(0., 0., 1.), -PROJECTION_PLANE_Z), // Near
+            Plane::new(Vec3::new(sqrt_2, 0., sqrt_2), 0.),          // Left
+            Plane::new(Vec3::new(-sqrt_2, 0., sqrt_2), 0.),         // Right
+            Plane::new(Vec3::new(0., sqrt_2, sqrt_2), 0.),          // Bottom
+            Plane::new(Vec3::new(0., -sqrt_2, sqrt_2), 0.),         // Top
+        ],
+    );
     let scene = Scene {
-        camera: Camera::new(Vec3::new(-3., 1.0, 2.0), Mat3::new_oy_rotation_matrix(-30.)),
+        camera,
         instances: vec![
             Instance::new(&cube_model, 0.75, Mat3::identity(), Vec3::new(-1.5, 0., 7.)),
             Instance::new(
@@ -97,6 +109,13 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
                 Mat3::new_oy_rotation_matrix(195.),
                 Vec3::new(1.25, 2.5, 7.5),
             ),
+            Instance::new(
+                &cube_model,
+                1.0,
+                Mat3::new_oy_rotation_matrix(195.),
+                Vec3::new(0., 0., -10.),
+            ),
+            Instance::new(&cube_model, 1.0, Mat3::identity(), Vec3::new(3., -1.5, 6.5)),
         ],
     };
 
@@ -232,16 +251,19 @@ impl Canvas {
 
     fn render_scene(&mut self, scene: &Scene) {
         for instance in scene.instances.iter() {
-            let instance_transformation = &scene.camera.transformation * &instance.transformation;
-            self.render_model(instance.model, &instance_transformation)
+            if let Some(model) = instance
+                .transform_and_clip(&scene.camera.transformation, &scene.camera.clipping_planes)
+            {
+                self.render_model(&model);
+            }
         }
     }
 
-    fn render_model(&mut self, model: &Model, instance_transformation: &Mat4) {
+    fn render_model(&mut self, model: &Model) {
         let projected = model
             .vertices
             .iter()
-            .map(|v| self.project(&(instance_transformation * v.to_vec4(1.0))))
+            .map(|v| self.project(&v.to_vec4(1.0)))
             .collect_vec();
 
         for Triangle { v1, v2, v3, color } in model.triangles.iter() {
@@ -262,6 +284,7 @@ impl Point {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
 struct Triangle {
     v1: usize,
     v2: usize,
@@ -280,9 +303,34 @@ struct Model {
     triangles: Vec<Triangle>,
 }
 
+impl Model {
+    fn new(vertices: Vec<Vec3>, triangles: Vec<Triangle>) -> Model {
+        Model {
+            vertices,
+            triangles,
+        }
+    }
+
+    fn bounding_sphere(&self) -> (Vec3, f64) {
+        let bounding_sphere_center = self
+            .vertices
+            .iter()
+            .fold(Vec3::new(0., 0., 0.), |v1, v2| v1 + v2)
+            / self.vertices.len() as f64;
+        let bounding_sphere_radius = self
+            .vertices
+            .iter()
+            .map(|v| (v - &bounding_sphere_center).len())
+            .max_by(|v1, v2| v1.partial_cmp(v2).unwrap())
+            .unwrap();
+        (bounding_sphere_center, bounding_sphere_radius)
+    }
+}
+
 struct Instance<'a> {
     model: &'a Model,
     transformation: Mat4,
+    scale: f64,
 }
 
 impl<'a> Instance<'a> {
@@ -295,19 +343,152 @@ impl<'a> Instance<'a> {
         Instance {
             model,
             transformation,
+            scale,
         }
+    }
+
+    fn transform_and_clip(
+        &self,
+        camera_transformation: &Mat4,
+        clipping_planes: &Vec<Plane>,
+    ) -> Option<Model> {
+        let transformation = camera_transformation * &self.transformation;
+        let (bounding_sphere_center, bounding_sphere_radius) = self.model.bounding_sphere();
+
+        let bounding_sphere_center = &transformation * bounding_sphere_center.to_vec4(1.0);
+        let bounding_sphere_radius = bounding_sphere_radius * self.scale;
+
+        let outside_any_clipping_plane = clipping_planes.iter().any(|plane| {
+            let distance = bounding_sphere_center.dot(&plane.normal) + plane.distance;
+            distance < -bounding_sphere_radius
+        });
+        if outside_any_clipping_plane {
+            None
+        } else {
+            let mut vertices = self
+                .model
+                .vertices
+                .iter()
+                .map(|v| (&transformation * v.to_vec4(1.0)).to_vec3())
+                .collect_vec();
+
+            let mut triangles = Vec::from(&self.model.triangles[..]);
+            for plane in clipping_planes {
+                let mut new_triangles = Vec::new();
+                for triangle in triangles {
+                    Self::clip_triangle(triangle, plane, &mut vertices, &mut new_triangles);
+                }
+                triangles = new_triangles;
+            }
+
+            Some(Model::new(vertices, triangles))
+        }
+    }
+
+    fn clip_triangle(
+        triangle: Triangle,
+        plane: &Plane,
+        vertices: &mut Vec<Vec3>,
+        triangles: &mut Vec<Triangle>,
+    ) {
+        let v = vec![triangle.v1, triangle.v2, triangle.v3];
+        let in_plane = v
+            .iter()
+            .map(|&v| (plane.normal.dot(&vertices[v]) + plane.distance))
+            .collect_vec();
+        let in_count = in_plane.iter().filter(|&&d| d > 0.).count();
+
+        if in_count == 1 {
+            // Let A be the vertex with a positive distance
+            // compute B' = Intersection(AB, plane)
+            // compute C' = Intersection(AC, plane)
+            // return [Triangle(A, B', C')]
+            let a_index = in_plane
+                .iter()
+                .position_max_by(|&a, &b| a.partial_cmp(b).unwrap())
+                .unwrap();
+            let (b_index, c_index) = (0..3).filter(|&i| i != a_index).collect_tuple().unwrap();
+            let b_prime = plane.segment_intersection(&vertices[v[a_index]], &vertices[v[b_index]]);
+            let c_prime = plane.segment_intersection(&vertices[v[a_index]], &vertices[v[c_index]]);
+
+            let b_prime_index = vertices.len();
+            let c_prime_index = vertices.len() + 1;
+            vertices.push(b_prime);
+            vertices.push(c_prime);
+
+            triangles.push(Triangle::new(
+                v[a_index],
+                b_prime_index,
+                c_prime_index,
+                triangle.color,
+            ))
+        } else if in_count == 2 {
+            // Let C be the vertex with a negative distance
+            // compute A' = Intersection(AC, plane)
+            // compute B' = Intersection(BC, plane)
+            // return [Triangle(A, B, A'), Triangle(A', B, B')]
+            let c_index = in_plane
+                .iter()
+                .position_min_by(|&a, &b| a.partial_cmp(b).unwrap())
+                .unwrap();
+            let (a_index, b_index) = (0..3).filter(|&i| i != c_index).collect_tuple().unwrap();
+
+            let a_prime = plane.segment_intersection(&vertices[v[a_index]], &vertices[v[c_index]]);
+            let b_prime = plane.segment_intersection(&vertices[v[b_index]], &vertices[v[c_index]]);
+
+            let a_prime_index = vertices.len();
+            let b_prime_index = vertices.len() + 1;
+            vertices.push(a_prime);
+            vertices.push(b_prime);
+
+            triangles.push(Triangle::new(
+                v[a_index],
+                v[b_index],
+                a_prime_index,
+                triangle.color,
+            ));
+            triangles.push(Triangle::new(
+                a_prime_index,
+                v[b_index],
+                b_prime_index,
+                triangle.color,
+            ));
+        } else if in_count == 3 {
+            triangles.push(triangle);
+        }
+    }
+}
+
+struct Plane {
+    normal: Vec3,
+    distance: f64,
+}
+
+impl Plane {
+    fn new(normal: Vec3, distance: f64) -> Plane {
+        Plane { normal, distance }
+    }
+
+    fn segment_intersection(&self, a: &Vec3, b: &Vec3) -> Vec3 {
+        let b_minus_a = b - a;
+        let t = -self.distance - self.normal.dot(a) / self.normal.dot(&b_minus_a);
+        a + b_minus_a * t
     }
 }
 
 struct Camera {
     transformation: Mat4,
+    clipping_planes: Vec<Plane>,
 }
 
 impl Camera {
-    fn new(position: Vec3, orientation: Mat3) -> Camera {
+    fn new(position: Vec3, orientation: Mat3, clipping_planes: Vec<Plane>) -> Camera {
         let transformation = orientation.transpose().to_homogenous_rotation()
             * (position * -1.).to_homogenous_translation();
-        Camera { transformation }
+        Camera {
+            transformation,
+            clipping_planes,
+        }
     }
 }
 
@@ -339,4 +520,14 @@ fn sort_points_by_y<'a>(
     points.sort_by_key(|&p| p.y);
     let [p0, p1, p2] = points;
     (p0, p1, p2)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::rasterizer::main::rasterizer;
+
+    #[test]
+    fn test_rasterizer() {
+        let res = rasterizer(600, 600);
+    }
 }

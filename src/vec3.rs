@@ -119,6 +119,14 @@ impl Add<Vec3> for Vec3 {
     }
 }
 
+impl Add<&Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn add(self, rhs: &Vec3) -> Self::Output {
+        &self + rhs
+    }
+}
+
 impl Mul<f64> for &Vec3 {
     type Output = Vec3;
 
@@ -227,6 +235,14 @@ impl Vec4 {
         Vec4 {
             e: [e1, e2, e3, e4],
         }
+    }
+
+    pub fn dot(&self, rhs: &Vec3) -> f64 {
+        (self.e[0] * rhs.e[0]) + (self.e[1] * rhs.e[1]) + (self.e[2] * rhs.e[2])
+    }
+
+    pub fn to_vec3(&self) -> Vec3 {
+        return Vec3::new(self.e[0], self.e[1], self.e[2]);
     }
 }
 
