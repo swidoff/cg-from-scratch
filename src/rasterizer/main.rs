@@ -160,7 +160,6 @@ impl Canvas {
         if x >= 0 && x < self.width && y >= 0 && y < self.height {
             let depth_offset = (y * self.width + x) as usize;
             if inv_z > self.depth_buffer[depth_offset] {
-                println!("{} {} {}", x, y, inv_z);
                 let pixel_offset = (y * self.width * 4 + x * 4) as usize;
                 self.pixels[pixel_offset] = color[0].clamp(0., 255.) as u8;
                 self.pixels[pixel_offset + 1] = color[1].clamp(0., 255.) as u8;
@@ -199,14 +198,32 @@ impl Canvas {
         vertices: &Vec<Vec3>,
         projected: &Vec<Point>,
     ) {
+        // Backface Culling
+        let normal = triangle.normal(vertices);
+        let center = triangle.center(vertices);
+        let x1 = (-center).dot(&normal);
+        println!(
+            "v1={:?}, v2={:?}, v3={:?}, color={:?}, center={:?}, normal={:?}, dot={}",
+            vertices[triangle.vertex_indices[0]],
+            vertices[triangle.vertex_indices[1]],
+            vertices[triangle.vertex_indices[2]],
+            triangle.color,
+            center,
+            normal,
+            x1
+        );
+        if x1 <= 0. {
+            return;
+        }
+
         // Find the points along the sides of the triangle.
         let [i0, i1, i2] = triangle.sorted_indexes_by_y(projected);
-        let p0 = &projected[i0];
-        let p1 = &projected[i1];
-        let p2 = &projected[i2];
         let v0 = &vertices[i0];
         let v1 = &vertices[i1];
         let v2 = &vertices[i2];
+        let p0 = &projected[i0];
+        let p1 = &projected[i1];
+        let p2 = &projected[i2];
 
         let (x02, x012) = edge_interpolate(p0.y, p0.x as f64, p1.y, p1.x as f64, p2.y, p2.x as f64);
         let (iz02, iz012) = edge_interpolate(p0.y, 1. / v0[2], p1.y, 1. / v1[2], p2.y, 1. / v2[2]);
@@ -330,6 +347,19 @@ impl Triangle {
         indexes.sort_by_key(|&i| vertexes[i].y);
         indexes
     }
+
+    fn normal(&self, vertices: &Vec<Vec3>) -> Vec3 {
+        let v1 = vertices[self.vertex_indices[1]] - &vertices[self.vertex_indices[0]];
+        let v2 = vertices[self.vertex_indices[2]] - &vertices[self.vertex_indices[0]];
+        v1.cross_product(&v2)
+    }
+
+    fn center(&self, vertices: &Vec<Vec3>) -> Vec3 {
+        (vertices[self.vertex_indices[0]]
+            + vertices[self.vertex_indices[1]]
+            + vertices[self.vertex_indices[2]])
+            / 3.
+    }
 }
 
 struct Model {
@@ -451,8 +481,8 @@ impl<'a> Instance<'a> {
 
             triangles.push(Triangle::new(
                 v[a_index],
-                b_prime_index,
                 c_prime_index,
+                b_prime_index,
                 triangle.color,
             ))
         } else if in_count == 2 {

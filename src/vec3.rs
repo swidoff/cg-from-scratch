@@ -17,6 +17,14 @@ impl Vec3 {
         (self.e[0] * rhs.e[0]) + (self.e[1] * rhs.e[1]) + (self.e[2] * rhs.e[2])
     }
 
+    pub fn cross_product(&self, rhs: &Vec3) -> Vec3 {
+        Vec3::new(
+            (self.e[1] * rhs.e[2]) - (self.e[2] * rhs.e[1]),
+            (self.e[2] * rhs.e[0]) - (self.e[0] * rhs.e[2]),
+            (self.e[0] * rhs.e[1]) - (self.e[1] * rhs.e[0]),
+        )
+    }
+
     pub fn len(&self) -> f64 {
         self.dot(self).sqrt()
     }
