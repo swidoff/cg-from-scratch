@@ -74,27 +74,27 @@ impl Scatter {
     /// Returns the fraction of light that is reflected as a function of the angle between the surface normal and the
     /// direction of the light.
     ///
-    fn reflect(&self, direction: &Vec3, l: &Vec3, normal: &Vec3) -> f64 {
-        let n_dot_l = normal.dot(&l);
+    fn reflect(&self, direction: &Vec3, light: &Vec3, normal: &Vec3) -> f64 {
+        let n_dot_l = normal.dot(&light);
         let mut res = if n_dot_l > 0. {
             // We're computing intensity / area, which is the equivalent to the cosine of the angle between the light
             // (l) and the surface normal. That is equal to <l, n> / |n||l|
-            n_dot_l / (normal.len() * l.len())
+            n_dot_l / (normal.len() * light.len())
         } else {
             0.
         };
 
         if let &Scatter::Specular { shininess } = self {
             // v is the vector from the object to the camera, so that's just -ray.direction;
-            let v = -direction;
+            let view = -direction;
 
             // r is the light reflected from the surface normal.
-            let r = l.reflect(normal);
-            let r_dot_v = r.dot(&v);
+            let reflected = light.reflect(normal);
+            let r_dot_v = reflected.dot(&view);
             if r_dot_v > 0. {
                 // The cosine of the angle between r and v, which is the fraction of light reflected back at v.
                 // The less shiny the object, the quicker that intensity decreases as the angle increases.
-                res += (r_dot_v / (r.len() * v.len())).powf(shininess);
+                res += (r_dot_v / (reflected.len() * view.len())).powf(shininess);
             }
         }
 

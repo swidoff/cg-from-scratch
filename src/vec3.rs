@@ -2,7 +2,7 @@ use std::ops::{Add, Div, Index, Mul, Neg, Sub};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Vec3 {
-    e: [f64; 3],
+    pub e: [f64; 3],
 }
 
 pub type Color = Vec3;
@@ -295,6 +295,14 @@ impl Mul<Vec4> for &Mat4 {
     type Output = Vec4;
 
     fn mul(self, v: Vec4) -> Self::Output {
+        self * &v
+    }
+}
+
+impl Mul<&Vec4> for &Mat4 {
+    type Output = Vec4;
+
+    fn mul(self, v: &Vec4) -> Self::Output {
         Vec4::new(
             self.e[0][0] * v[0] + self.e[0][1] * v[1] + self.e[0][2] * v[2] + self.e[0][3] * v[3],
             self.e[1][0] * v[0] + self.e[1][1] * v[1] + self.e[1][2] * v[2] + self.e[1][3] * v[3],

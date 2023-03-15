@@ -1,1 +1,13 @@
+mod camera;
+mod canvas;
+mod instance;
+mod light;
 pub mod main;
+mod model;
+mod plane;
+mod point;
+mod scene;
+mod shading;
+mod triangle;
+mod util;
+mod utils;
