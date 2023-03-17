@@ -140,8 +140,7 @@ impl Canvas {
             );
 
             for (xi, x) in (x_left..(x_right + 1)).enumerate() {
-                let inv_z = iz_segment[xi];
-                self.put_pixel(x as i64, y, inv_z, &(&triangle.color * intensities[xi]));
+                self.put_pixel(x, y, iz_segment[xi], &(&triangle.color * intensities[xi]));
             }
         }
     }

@@ -117,23 +117,25 @@ impl Shader {
                 ny_edges,
                 nz_edges,
             } => {
+                let x_left = x[left].floor() as i64;
+                let x_right = x[right].ceil() as i64;
                 let nxscan = util::interpolate(
-                    x[left].floor() as i64,
+                    x_left,
                     nx_edges[left][i].1 as f64,
-                    x[right].ceil() as i64,
+                    x_right,
                     nx_edges[right][i].1 as f64,
                 );
                 let nyscan = util::interpolate(
-                    x[left].floor() as i64,
+                    x_left,
                     ny_edges[left][i].1 as f64,
-                    x[right].ceil() as i64,
+                    x_right,
                     ny_edges[right][i].1 as f64,
                 )
                 .map(|(_i, d)| d);
                 let nzscan = util::interpolate(
-                    x[left].floor() as i64,
+                    x_left,
                     nz_edges[left][i].1 as f64,
-                    x[right].ceil() as i64,
+                    x_right,
                     nz_edges[right][i].1 as f64,
                 )
                 .map(|(_i, d)| d);
