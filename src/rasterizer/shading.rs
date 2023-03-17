@@ -92,7 +92,7 @@ impl Shader {
         right: usize,
         i: usize,
         y: i64,
-        x: [i64; 2],
+        x: [f64; 2],
         inv_z: &Vec<f64>,
         canvas_width: i64,
         canvas_height: i64,
@@ -102,35 +102,38 @@ impl Shader {
     ) -> Vec<f64> {
         match self {
             &Shader::Flat { intensity } => iter::repeat(intensity)
-                .take((x[right] - x[left] + 1).max(0) as usize)
+                .take((x[right].ceil() - x[left].floor() + 1.0).max(0.0) as usize)
                 .collect_vec(),
-            Shader::Gouraud { i_edges } => {
-                util::interpolate(x[left], i_edges[left][i].1, x[right], i_edges[right][i].1)
-                    .map(|(_i, d)| d)
-                    .collect_vec()
-            }
+            Shader::Gouraud { i_edges } => util::interpolate(
+                x[left].floor() as i64,
+                i_edges[left][i].1,
+                x[right].ceil() as i64,
+                i_edges[right][i].1,
+            )
+            .map(|(_i, d)| d)
+            .collect_vec(),
             Shader::Phong {
                 nx_edges,
                 ny_edges,
                 nz_edges,
             } => {
                 let nxscan = util::interpolate(
-                    x[left],
+                    x[left].floor() as i64,
                     nx_edges[left][i].1 as f64,
-                    x[right],
+                    x[right].ceil() as i64,
                     nx_edges[right][i].1 as f64,
                 );
                 let nyscan = util::interpolate(
-                    x[left],
+                    x[left].floor() as i64,
                     ny_edges[left][i].1 as f64,
-                    x[right],
+                    x[right].ceil() as i64,
                     ny_edges[right][i].1 as f64,
                 )
                 .map(|(_i, d)| d);
                 let nzscan = util::interpolate(
-                    x[left],
+                    x[left].floor() as i64,
                     nz_edges[left][i].1 as f64,
-                    x[right],
+                    x[right].ceil() as i64,
                     nz_edges[right][i].1 as f64,
                 )
                 .map(|(_i, d)| d);

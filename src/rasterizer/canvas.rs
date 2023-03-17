@@ -117,8 +117,8 @@ impl Canvas {
 
         // Draw the horizontal line segments.
         for (yi, &(y, x_left)) in x_edges[left].iter().enumerate() {
-            let x_left = x_left as i64;
-            let x_right = x_edges[right][yi].1 as i64;
+            let x_left = x_left.floor() as i64;
+            let x_right = x_edges[right][yi].1.ceil() as i64;
             let iz_left = iz_edges[left][yi].1;
             let iz_right = iz_edges[right][yi].1;
             let iz_segment = util::interpolate(x_left, iz_left, x_right, iz_right)
@@ -130,7 +130,7 @@ impl Canvas {
                 right,
                 yi,
                 y,
-                [x_edges[0][yi].1 as i64, x_edges[1][yi].1 as i64],
+                [x_edges[0][yi].1, x_edges[1][yi].1],
                 &iz_segment,
                 self.width,
                 self.height,
