@@ -64,7 +64,7 @@ impl Scatter {
 
                 // Specular Component
                 if let &Scatter::Specular { shininess } = self {
-                    let reflected = v1.reflect(normal) - &v1;
+                    let reflected = v1.reflect(normal);
                     let view = camera.position - vertex;
                     let cos_beta = reflected.dot(&view) / (reflected.len() * view.len());
                     if cos_beta > 0. {
