@@ -10,4 +10,3 @@ mod scene;
 mod shading;
 mod triangle;
 mod util;
-mod utils;

@@ -34,8 +34,8 @@ impl Triangle {
     }
 
     pub fn sorted_indexes_by_y(&self, vertexes: &Vec<Point>) -> [usize; 3] {
-        let mut indexes = self.vertex_indices.clone();
-        indexes.sort_by_key(|&i| vertexes[i].y);
+        let mut indexes = [0, 1, 2];
+        indexes.sort_by_key(|&i| vertexes[self.vertex_indices[i]].y);
         indexes
     }
 

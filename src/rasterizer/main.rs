@@ -5,7 +5,7 @@ use crate::rasterizer::light::{Light, Scatter};
 use crate::rasterizer::model::Model;
 use crate::rasterizer::plane::Plane;
 use crate::rasterizer::scene::Scene;
-use crate::rasterizer::shading::ShadingModel::Flat;
+use crate::rasterizer::shading::ShadingModel::{Flat, Gouraud, Phong};
 use crate::rasterizer::triangle::Triangle;
 use crate::rasterizer::util::PROJECTION_PLANE_Z;
 use crate::utils;
@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     utils::set_panic_hook();
-    let mut canvas = Canvas::new(canvas_height, canvas_width, Flat);
+    let mut canvas = Canvas::new(canvas_height, canvas_width, Phong);
 
     // let black = Color::new(0., 0., 0.);
     let red = Color::new(255., 0., 0.);
@@ -25,6 +25,7 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
     let purple = Color::new(255., 0., 255.);
     let cyan = Color::new(0., 255., 255.);
 
+    let scatter = Scatter::Specular { shininess: 50.0 };
     let cube_model = Model::new(
         vec![
             Vec3::new(1., 1., 1.),
@@ -60,63 +61,63 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
                 5,
                 6,
                 yellow,
-                Vec3::new(1., 0., 0.),
-                Vec3::new(1., 0., 0.),
-                Vec3::new(1., 0., 0.),
+                Vec3::new(-1., 0., 0.),
+                Vec3::new(-1., 0., 0.),
+                Vec3::new(-1., 0., 0.),
             ),
             Triangle::new(
                 1,
                 6,
                 2,
                 yellow,
-                Vec3::new(1., 0., 0.),
-                Vec3::new(1., 0., 0.),
-                Vec3::new(1., 0., 0.),
+                Vec3::new(-1., 0., 0.),
+                Vec3::new(-1., 0., 0.),
+                Vec3::new(-1., 0., 0.),
             ),
             Triangle::new(
                 2,
                 6,
                 7,
                 cyan,
-                Vec3::new(0., 0., -1.),
-                Vec3::new(0., 0., -1.),
-                Vec3::new(0., 0., -1.),
+                Vec3::new(0., -1., 0.),
+                Vec3::new(0., -1., 0.),
+                Vec3::new(0., -1., 0.),
             ),
             Triangle::new(
                 2,
                 7,
                 3,
                 cyan,
-                Vec3::new(0., 0., -1.),
-                Vec3::new(0., 0., -1.),
-                Vec3::new(0., 0., -1.),
+                Vec3::new(0., -1., 0.),
+                Vec3::new(0., -1., 0.),
+                Vec3::new(0., -1., 0.),
             ),
             Triangle::new(
                 4,
                 0,
                 3,
                 green,
-                Vec3::new(-1., 0., 0.),
-                Vec3::new(-1., 0., 0.),
-                Vec3::new(-1., 0., 0.),
+                Vec3::new(1., 0., 0.),
+                Vec3::new(1., 0., 0.),
+                Vec3::new(1., 0., 0.),
             ),
             Triangle::new(
                 4,
                 1,
                 0,
                 purple,
-                Vec3::new(-1., 0., 0.),
-                Vec3::new(-1., 0., 0.),
-                Vec3::new(-1., 0., 0.),
+                Vec3::new(0., 1., 0.),
+                Vec3::new(0., 1., 0.),
+                Vec3::new(0., 1., 0.),
             ),
             Triangle::new(
                 4,
                 3,
                 7,
                 green,
-                Vec3::new(0., 1., 0.),
-                Vec3::new(0., 1., 0.),
-                Vec3::new(0., 1., 0.),
+                Vec3::new(1., 0., 0.),
+                Vec3::new(1., 0., 0.),
+                Vec3::new(1., 01., 0.),
             ),
             Triangle::new(
                 4,
@@ -132,22 +133,24 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
                 4,
                 7,
                 blue,
-                Vec3::new(0., -1., 0.),
-                Vec3::new(0., -1., 0.),
-                Vec3::new(0., -1., 0.),
+                Vec3::new(0., 0., -1.),
+                Vec3::new(0., 0., -1.),
+                Vec3::new(0., 0., -1.),
             ),
             Triangle::new(
                 5,
                 7,
                 6,
                 blue,
-                Vec3::new(0., -1., 0.),
-                Vec3::new(0., -1., 0.),
-                Vec3::new(0., -1., 0.),
+                Vec3::new(0., 0., -1.),
+                Vec3::new(0., 0., -1.),
+                Vec3::new(0., 0., -1.),
             ),
         ],
-        Scatter::Specular { shininess: 50.0 },
+        scatter,
     );
+    let sphere = Model::make_sphere(15, green, scatter);
+
     let sqrt_2 = 2.0_f64.sqrt();
     let camera = Camera::new(
         Vec3::new(-3., 1.0, 2.0),
@@ -170,13 +173,14 @@ pub fn rasterizer(canvas_height: usize, canvas_width: usize) -> Vec<u8> {
                 Mat3::new_oy_rotation_matrix(195.),
                 Vec3::new(1.25, 2.5, 7.5),
             ),
-            Instance::new(
-                &cube_model,
-                1.0,
-                Mat3::new_oy_rotation_matrix(195.),
-                Vec3::new(0., 0., -10.),
-            ),
-            Instance::new(&cube_model, 1.0, Mat3::identity(), Vec3::new(3., -1.5, 6.5)),
+            Instance::new(&sphere, 1.5, Mat3::identity(), Vec3::new(1.75, -0.5, 7.)),
+            // Instance::new(
+            //     &cube_model,
+            //     1.0,
+            //     Mat3::new_oy_rotation_matrix(195.),
+            //     Vec3::new(0., 0., -10.),
+            // ),
+            // Instance::new(&cube_model, 1.0, Mat3::identity(), Vec3::new(3., -1.5, 6.5)),
         ],
         lights: vec![
             Light::Ambient { intensity: 0.2 },

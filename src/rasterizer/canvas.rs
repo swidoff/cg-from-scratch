@@ -76,12 +76,12 @@ impl Canvas {
 
         // Find the points along the sides of the triangle.
         let [i0, i1, i2] = triangle.sorted_indexes_by_y(projected);
-        let v0 = &vertices[i0];
-        let v1 = &vertices[i1];
-        let v2 = &vertices[i2];
-        let p0 = &projected[i0];
-        let p1 = &projected[i1];
-        let p2 = &projected[i2];
+        let v0 = &vertices[triangle.vertex_indices[i0]];
+        let v1 = &vertices[triangle.vertex_indices[i1]];
+        let v2 = &vertices[triangle.vertex_indices[i2]];
+        let p0 = &projected[triangle.vertex_indices[i0]];
+        let p1 = &projected[triangle.vertex_indices[i1]];
+        let p2 = &projected[triangle.vertex_indices[i2]];
 
         let x_edges =
             util::edge_interpolate(p0.y, p0.x as f64, p1.y, p1.x as f64, p2.y, p2.x as f64);
@@ -99,17 +99,17 @@ impl Canvas {
             let transformation = camera.orientation.transpose().to_homogenous_rotation()
                 * orientation.to_homogenous_rotation();
             [
-                (&transformation * normals[0].to_vec4(1.0)).to_vec3(),
-                (&transformation * normals[1].to_vec4(1.0)).to_vec3(),
-                (&transformation * normals[2].to_vec4(1.0)).to_vec3(),
+                (&transformation * normals[i0].to_vec4(1.0)).to_vec3(),
+                (&transformation * normals[i1].to_vec4(1.0)).to_vec3(),
+                (&transformation * normals[i2].to_vec4(1.0)).to_vec3(),
             ]
         });
 
-        // let normals = match &vertex_normals {
-        //     None => [&normal, &normal, &normal],
-        //     Some(normals) => [&normals[0], &normals[1], &normals[2]],
-        // };
-        let normals = [&normal, &normal, &normal];
+        let normals = match &vertex_normals {
+            None => [&normal, &normal, &normal],
+            Some(normals) => [&normals[0], &normals[1], &normals[2]],
+        };
+        // let normals = [&normal, &normal, &normal];
 
         let shader =
             self.shading_model

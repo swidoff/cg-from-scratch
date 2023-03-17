@@ -40,25 +40,25 @@ impl ShadingModel {
                 let nx_edges = util::edge_interpolate(
                     points[0].y,
                     normals[0][0],
-                    points[0].y,
-                    normals[1][0],
                     points[1].y,
+                    normals[1][0],
+                    points[2].y,
                     normals[2][0],
                 );
                 let ny_edges = util::edge_interpolate(
                     points[0].y,
                     normals[0][1],
-                    points[0].y,
-                    normals[1][1],
                     points[1].y,
+                    normals[1][1],
+                    points[2].y,
                     normals[2][1],
                 );
                 let nz_edges = util::edge_interpolate(
                     points[0].y,
                     normals[0][2],
-                    points[0].y,
-                    normals[1][2],
                     points[1].y,
+                    normals[1][2],
+                    points[2].y,
                     normals[2][2],
                 );
                 Shader::Phong {
@@ -102,7 +102,7 @@ impl Shader {
     ) -> Vec<f64> {
         match self {
             &Shader::Flat { intensity } => iter::repeat(intensity)
-                .take((x[right] - x[left] + 1) as usize)
+                .take((x[right] - x[left] + 1).max(0) as usize)
                 .collect_vec(),
             Shader::Gouraud { i_edges } => {
                 util::interpolate(x[left], i_edges[left][i].1, x[right], i_edges[right][i].1)

@@ -34,9 +34,8 @@ impl<'a> Instance<'a> {
         clipping_planes: &Vec<Plane>,
     ) -> Option<Model> {
         let transformation = camera_transformation * &self.transformation;
-        let (bounding_sphere_center, bounding_sphere_radius) = self.model.bounding_sphere();
-        let bounding_sphere_center = &transformation * bounding_sphere_center.to_vec4(1.0);
-        let bounding_sphere_radius = bounding_sphere_radius * self.scale;
+        let bounding_sphere_center = &transformation * self.model.bounds_center.to_vec4(1.0);
+        let bounding_sphere_radius = self.model.bounds_radius * self.scale;
 
         let outside_any_clipping_plane = clipping_planes.iter().any(|plane| {
             let distance = bounding_sphere_center.dot(&plane.normal) + plane.distance;
