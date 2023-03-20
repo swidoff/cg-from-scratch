@@ -140,7 +140,10 @@ impl Shader {
                 )
                 .map(|(_i, d)| d);
 
-                iter::zip(iter::zip(iter::zip(nxscan, nyscan), nzscan), inv_z.iter())
+                nxscan
+                    .zip(nyscan)
+                    .zip(nzscan)
+                    .zip(inv_z.iter())
                     .map(|((((x, nx), ny), nz), &inv_z)| {
                         let vertex = util::unproject_vertex(
                             x as f64,

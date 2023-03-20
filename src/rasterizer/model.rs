@@ -1,6 +1,7 @@
 use crate::rasterizer::light::Scatter;
+use crate::rasterizer::surface::Surface;
 use crate::rasterizer::triangle::Triangle;
-use crate::vec3::{Color, Vec3};
+use crate::vec3::Vec3;
 use std::f64::consts::PI;
 
 pub struct Model {
@@ -32,7 +33,7 @@ impl Model {
         }
     }
 
-    pub fn make_sphere(divs: usize, color: Color, scatter: Scatter) -> Model {
+    pub fn make_sphere(divs: usize, surface: Surface, scatter: Scatter) -> Model {
         let mut vertices = Vec::new();
         let mut triangles = Vec::new();
         let n_divs = divs as f64;
@@ -57,7 +58,7 @@ impl Model {
                     i0,
                     i1,
                     i2,
-                    color,
+                    surface.clone(),
                     vertices[i0],
                     vertices[i1],
                     vertices[i2],
@@ -66,7 +67,7 @@ impl Model {
                     i0,
                     i0 + divs,
                     i1,
-                    color,
+                    surface.clone(),
                     vertices[i0],
                     vertices[i0 + divs],
                     vertices[i1],

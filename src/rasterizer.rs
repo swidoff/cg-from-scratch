@@ -8,5 +8,7 @@ mod plane;
 mod point;
 mod scene;
 mod shading;
+mod surface;
+mod texture;
 mod triangle;
 mod util;

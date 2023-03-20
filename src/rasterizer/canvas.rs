@@ -4,6 +4,7 @@ use crate::rasterizer::model::Model;
 use crate::rasterizer::point::Point;
 use crate::rasterizer::scene::Scene;
 use crate::rasterizer::shading::ShadingModel;
+use crate::rasterizer::texture::Texture;
 use crate::rasterizer::triangle::Triangle;
 use crate::rasterizer::util;
 use crate::vec3::{Color, Mat3, Vec3, Vec4};
@@ -62,6 +63,7 @@ impl Canvas {
         triangle: &Triangle,
         vertices: &Vec<Vec3>,
         projected: &Vec<Point>,
+        textures: &Vec<Texture>,
         camera: &Camera,
         lights: &Vec<Light>,
         scatter: &Scatter,
@@ -75,13 +77,16 @@ impl Canvas {
         }
 
         // Find the points along the sides of the triangle.
-        let [i0, i1, i2] = triangle.sorted_indexes_by_y(projected);
+        let indexes @ [i0, i1, i2] = triangle.sorted_indexes_by_y(projected);
         let v0 = &vertices[triangle.vertex_indices[i0]];
         let v1 = &vertices[triangle.vertex_indices[i1]];
         let v2 = &vertices[triangle.vertex_indices[i2]];
+        let vertices = [v0, v1, v2];
+
         let p0 = &projected[triangle.vertex_indices[i0]];
         let p1 = &projected[triangle.vertex_indices[i1]];
         let p2 = &projected[triangle.vertex_indices[i2]];
+        let points = [p0, p1, p2];
 
         let x_edges =
             util::edge_interpolate(p0.y, p0.x as f64, p1.y, p1.x as f64, p2.y, p2.x as f64);
@@ -109,11 +114,11 @@ impl Canvas {
             None => [&normal, &normal, &normal],
             Some(normals) => [&normals[0], &normals[1], &normals[2]],
         };
-        // let normals = [&normal, &normal, &normal];
 
-        let shader =
-            self.shading_model
-                .shader([v0, v1, v2], [p0, p1, p2], normals, camera, lights, scatter);
+        let shader = self
+            .shading_model
+            .shader(vertices, points, normals, camera, lights, scatter);
+        let color_generator = triangle.surface.color_generator(indexes, vertices, points);
 
         // Draw the horizontal line segments.
         for (yi, &(y, x_left)) in x_edges[left].iter().enumerate() {
@@ -125,12 +130,14 @@ impl Canvas {
                 .map(|(_x, inv_z)| inv_z)
                 .collect_vec();
 
+            let x = [x_edges[0][yi].1, x_edges[1][yi].1];
+            let colors = color_generator.colors(left, right, yi, x, &iz_segment, textures);
             let intensities = shader.intensities(
                 left,
                 right,
                 yi,
                 y,
-                [x_edges[0][yi].1, x_edges[1][yi].1],
+                x,
                 &iz_segment,
                 self.width,
                 self.height,
@@ -140,7 +147,7 @@ impl Canvas {
             );
 
             for (xi, x) in (x_left..(x_right + 1)).enumerate() {
-                self.put_pixel(x, y, iz_segment[xi], &(&triangle.color * intensities[xi]));
+                self.put_pixel(x, y, iz_segment[xi], &(colors[xi] * intensities[xi]));
             }
         }
     }
@@ -154,7 +161,13 @@ impl Canvas {
             if let Some(model) = instance
                 .transform_and_clip(&scene.camera.transformation, &scene.camera.clipping_planes)
             {
-                self.render_model(&model, &scene.camera, &scene.lights, &instance.rotation);
+                self.render_model(
+                    &model,
+                    &scene.camera,
+                    &scene.lights,
+                    &instance.rotation,
+                    &scene.textures,
+                );
             }
         }
     }
@@ -165,6 +178,7 @@ impl Canvas {
         camera: &Camera,
         lights: &Vec<Light>,
         orientation: &Mat3,
+        textures: &Vec<Texture>,
     ) {
         let projected = model
             .vertices
@@ -177,6 +191,7 @@ impl Canvas {
                 triangle,
                 &model.vertices,
                 &projected,
+                textures,
                 camera,
                 lights,
                 &model.scatter,

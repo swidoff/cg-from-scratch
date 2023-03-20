@@ -99,7 +99,7 @@ impl<'a> Instance<'a> {
                 v[a_index],
                 c_prime_index,
                 b_prime_index,
-                triangle.color,
+                triangle.surface,
             ))
         } else if in_count == 2 {
             // Let C be the vertex with a negative distance
@@ -124,13 +124,13 @@ impl<'a> Instance<'a> {
                 v[a_index],
                 v[b_index],
                 a_prime_index,
-                triangle.color,
+                triangle.surface.clone(),
             ));
             triangles.push(Triangle::new_no_normals(
                 a_prime_index,
                 v[b_index],
                 b_prime_index,
-                triangle.color,
+                triangle.surface.clone(),
             ));
         } else if in_count == 3 {
             triangles.push(triangle);

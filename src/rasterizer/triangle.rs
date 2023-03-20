@@ -1,10 +1,16 @@
 use crate::rasterizer::point::Point;
+use crate::rasterizer::surface::Surface;
+use crate::rasterizer::texture::Texture;
+use crate::rasterizer::util;
 use crate::vec3::{Color, Vec3};
+use itertools;
+use itertools::Itertools;
+use std::iter;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Triangle {
     pub vertex_indices: [usize; 3],
-    pub color: Color,
+    pub surface: Surface,
     pub normals: Option<[Vec3; 3]>,
 }
 
@@ -13,22 +19,22 @@ impl Triangle {
         v1: usize,
         v2: usize,
         v3: usize,
-        color: Color,
+        surface: Surface,
         n1: Vec3,
         n2: Vec3,
         n3: Vec3,
     ) -> Triangle {
         Triangle {
             vertex_indices: [v1, v2, v3],
-            color,
+            surface,
             normals: Some([n1, n2, n3]),
         }
     }
 
-    pub fn new_no_normals(v1: usize, v2: usize, v3: usize, color: Color) -> Triangle {
+    pub fn new_no_normals(v1: usize, v2: usize, v3: usize, surface: Surface) -> Triangle {
         Triangle {
             vertex_indices: [v1, v2, v3],
-            color,
+            surface,
             normals: None,
         }
     }
