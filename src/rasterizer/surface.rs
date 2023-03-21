@@ -84,7 +84,7 @@ impl ColorGenerator {
                     .map(|((u, v), &inv_z)| {
                         let u = u / inv_z;
                         let v = v / inv_z;
-                        texture.color_at(u, v)
+                        texture.texel_color(u, v)
                     })
                     .collect_vec()
             }
